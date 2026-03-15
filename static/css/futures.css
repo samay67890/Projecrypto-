@@ -230,44 +230,9 @@
     height: 100%;
 }
 
-.futures-shell .y-axis {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 60px;
-    border-left: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 10px 5px 10px 0;
-    align-items: flex-end;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10px;
-}
-
-.futures-shell .axis-price-pill {
-    background: var(--color-up);
-    color: var(--bg-base);
-    padding: 2px 4px;
-    border-radius: 2px;
-    font-weight: bold;
-}
-
+.futures-shell .y-axis,
 .futures-shell .x-axis {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 60px;
-    height: 20px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 10px;
+    display: none;
 }
 
 .futures-shell .bottom-panel {
@@ -388,20 +353,19 @@
     width: 100%;
     font-family: var(--font-mono);
     font-size: 11px;
-    line-height: 1.8;
 }
 
 .futures-shell .ob-table tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    padding: 0 16px;
+    display: flex;
+    padding: 4px 12px;
 }
 
 .futures-shell .ob-table th {
+    flex: 1;
     color: var(--text-secondary);
     font-weight: normal;
     text-align: right;
-    padding: 4px 0;
+    padding: 0;
 }
 
 .futures-shell .ob-table th:first-child {
@@ -415,36 +379,39 @@
     justify-content: flex-end;
     font-family: var(--font-mono);
     font-size: 11px;
-    line-height: 1.8;
+    overflow: hidden;
 }
 
 .futures-shell .ob-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    padding: 0 16px;
+    display: flex;
+    padding: 2px 12px;
     cursor: pointer;
     position: relative;
+    line-height: 1.7;
+}
+
+.futures-shell .ob-row:hover {
+    background: rgba(255,255,255,0.04);
 }
 
 .futures-shell .ob-row span {
-    z-index: 1;
-}
-
-.futures-shell .ob-row span:nth-child(2),
-.futures-shell .ob-row span:nth-child(3),
-.futures-shell .ob-row span:nth-child(4) {
+    flex: 1;
     text-align: right;
+    z-index: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.futures-shell .ob-row span:nth-child(2) {
+.futures-shell .ob-row span:first-of-type {
     text-align: left;
 }
 
-.futures-shell .ob-row.ask span:nth-child(2) {
+.futures-shell .ob-row.ask span:first-of-type {
     color: var(--color-down);
 }
 
-.futures-shell .ob-row.bid span:nth-child(2) {
+.futures-shell .ob-row.bid span:first-of-type {
     color: var(--color-up);
 }
 
