@@ -1,0 +1,149 @@
+<div class="overview-view">
+    <section class="overview-portfolio-card">
+        <div class="overview-portfolio-label">Total Portfolio Value</div>
+        <div class="overview-portfolio-row">
+            <span class="overview-portfolio-amount" id="overviewTotalValue" data-real-value="$0.00">$0.00</span>
+            <span class="overview-portfolio-currency">USD</span>
+            <button type="button" class="overview-visibility-btn" id="overviewToggleVisibility" aria-label="Toggle portfolio visibility">
+                <i class="far fa-eye"></i>
+            </button>
+        </div>
+        <div class="overview-portfolio-change is-up" id="overviewPnlLine">
+            <i class="fas fa-caret-up" id="overviewPnlIcon"></i>
+            <span id="overviewPnlText">+0.00% (+$0.00)</span>
+            <span class="overview-change-note">Today's PNL</span>
+        </div>
+    </section>
+
+    <div class="overview-actions">
+        <a class="overview-action-btn primary" href="?view=trade" data-view="trade">
+            <i class="fas fa-chart-line"></i> Open Trade
+        </a>
+        <a class="overview-action-btn" href="?view=futures" data-view="futures">
+            <i class="fas fa-layer-group"></i> Open Futures
+        </a>
+        <a class="overview-action-btn ghost" href="?view=history" data-view="history">
+            <i class="fas fa-book"></i> View Portfolio
+        </a>
+    </div>
+    <div class="overview-breakdown-header">
+        <h3>Asset Distribution</h3>
+        <span class="overview-manage-link">Live Portfolio Snapshot - <span id="overviewLastUpdated">--:--:--</span></span>
+    </div>
+
+    <div class="overview-asset-grid">
+        <article class="overview-asset-item">
+            <div class="overview-asset-name"><i class="fas fa-wallet"></i> Fiat & Spot</div>
+            <div class="overview-asset-value" id="overviewFiatSpotValue" data-real-value="$0.00">$0.00</div>
+            <div class="overview-asset-share" id="overviewFiatSpotShare">0.0% of Portfolio</div>
+        </article>
+        <article class="overview-asset-item">
+            <div class="overview-asset-name"><i class="fas fa-bolt"></i> Margin</div>
+            <div class="overview-asset-value" id="overviewMarginValue" data-real-value="$0.00">$0.00</div>
+            <div class="overview-asset-share" id="overviewMarginShare">0.0% of Portfolio</div>
+        </article>
+        <article class="overview-asset-item">
+            <div class="overview-asset-name"><i class="fas fa-chart-line"></i> Futures</div>
+            <div class="overview-asset-value" id="overviewFuturesValue" data-real-value="$0.00">$0.00</div>
+            <div class="overview-asset-share" id="overviewFuturesShare">0.0% of Portfolio</div>
+        </article>
+        <article class="overview-asset-item">
+            <div class="overview-asset-name"><i class="fas fa-coins"></i> Earn</div>
+            <div class="overview-asset-value" id="overviewEarnValue" data-real-value="$0.00">$0.00</div>
+            <div class="overview-asset-share" id="overviewEarnShare">0.0% of Portfolio</div>
+        </article>
+    </div>
+
+    <div class="overview-breakdown-header">
+        <h3>Investment Performance</h3>
+        <span class="overview-manage-link">Initial vs Current</span>
+    </div>
+
+    <div class="overview-metrics-grid">
+        <article class="overview-metric-card">
+            <div class="overview-metric-label">Initial Investment</div>
+            <div class="overview-metric-value" id="overviewInitialInvestment">$0.00</div>
+        </article>
+        <article class="overview-metric-card">
+            <div class="overview-metric-label">Current Value</div>
+            <div class="overview-metric-value" id="overviewCurrentValue">$0.00</div>
+        </article>
+        <article class="overview-metric-card">
+            <div class="overview-metric-label">Net Invested</div>
+            <div class="overview-metric-value" id="overviewNetInvested">$0.00</div>
+        </article>
+        <article class="overview-metric-card">
+            <div class="overview-metric-label">Total Profit / Loss</div>
+            <div class="overview-metric-value is-up" id="overviewTotalPnl">$0.00 (0.00%)</div>
+        </article>
+        <article class="overview-metric-card">
+            <div class="overview-metric-label">Capital Added (Transactions)</div>
+            <div class="overview-metric-value" id="overviewCapitalIn">$0.00</div>
+        </article>
+        <article class="overview-metric-card">
+            <div class="overview-metric-label">Capital Withdrawn (Transactions)</div>
+            <div class="overview-metric-value" id="overviewCapitalOut">$0.00</div>
+        </article>
+        <article class="overview-metric-card">
+            <div class="overview-metric-label">Realized P/L (Trade History)</div>
+            <div class="overview-metric-value is-up" id="overviewRealizedPnl">$0.00</div>
+        </article>
+    </div>
+
+    <div class="overview-breakdown-header">
+        <h3>Investments You Bought</h3>
+        <span class="overview-manage-link">Spot, Margin, Futures</span>
+    </div>
+
+    <div class="overview-investments-card">
+        <div class="overview-investments-table-wrap">
+            <table class="overview-investments-table">
+                <thead>
+                    <tr>
+                        <th>Asset / Market</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Invested</th>
+                        <th>Current</th>
+                        <th>P/L</th>
+                    </tr>
+                </thead>
+                <tbody id="overviewInvestmentsBody">
+                    <tr>
+                        <td colspan="6" class="overview-empty-row">No investments yet. Start trading to populate this table.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="overview-breakdown-header">
+        <h3>Transaction Ledger</h3>
+        <span class="overview-manage-link">Linked to Transaction History</span>
+    </div>
+
+    <div class="overview-investments-card">
+        <div class="overview-investments-table-wrap">
+            <table class="overview-investments-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="overviewTransactionsBody">
+                    <tr>
+                        <td colspan="5" class="overview-empty-row">No transaction records yet.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+
+

@@ -1,0 +1,755 @@
+.futures-shell {
+    --bg-base: #0b0e11;
+    --bg-panel: #181a20;
+    --bg-hover: #2b3139;
+    --bg-input: #2b3139;
+    --text-primary: #eaecef;
+    --text-secondary: #848e9c;
+    --color-up: #0ecb81;
+    --color-down: #f6465d;
+    --color-up-bg: rgba(14, 203, 129, 0.1);
+    --color-down-bg: rgba(246, 70, 93, 0.1);
+    --border-color: #2b3139;
+    --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    font-size: 12px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#view-futures {
+    padding: 0;
+    height: 100%;
+}
+
+.futures-shell * {
+    box-sizing: border-box;
+}
+
+.futures-shell a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.futures-shell .futures-header {
+    height: 56px;
+    background-color: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+}
+
+.futures-shell .nav-left,
+.futures-shell .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.futures-shell .logo {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0ecb81;
+    letter-spacing: 1px;
+}
+
+.futures-shell .logo span {
+    color: var(--text-primary);
+    font-weight: normal;
+    font-size: 14px;
+}
+
+.futures-shell .nav-links a {
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+}
+
+.futures-shell .nav-links a:hover,
+.futures-shell .nav-links a.active {
+    color: var(--text-primary);
+}
+
+.futures-shell .nav-icons span {
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+.futures-shell .ticker-bar {
+    height: 60px;
+    background-color: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.futures-shell .ticker-symbol {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.futures-shell .ticker-symbol .star {
+    color: #0ecb81;
+    font-size: 16px;
+}
+
+.futures-shell .ticker-symbol .type {
+    background: var(--bg-hover);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: normal;
+    color: var(--text-secondary);
+}
+
+.futures-shell .ticker-price {
+    display: flex;
+    flex-direction: column;
+}
+
+.futures-shell .ticker-price .price {
+    font-size: 18px;
+    color: var(--color-up);
+    font-weight: bold;
+    font-family: var(--font-mono);
+}
+
+.futures-shell .ticker-price .fiat {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.futures-shell .ticker-stats {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.futures-shell .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.futures-shell .stat-label {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.futures-shell .stat-value {
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+.futures-shell .stat-value.up {
+    color: var(--color-up);
+}
+
+.futures-shell .stat-value.down {
+    color: var(--color-down);
+}
+
+.futures-shell .main-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.futures-shell .left-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    min-width: 0;
+}
+
+.futures-shell .right-col {
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-panel);
+    flex-shrink: 0;
+}
+
+.futures-shell .chart-section {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-base);
+    position: relative;
+    min-height: 360px;
+}
+
+.futures-shell .chart-toolbar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 16px;
+    color: var(--text-secondary);
+}
+
+.futures-shell .chart-toolbar span.active {
+    color: var(--color-up);
+}
+
+.futures-shell .chart-toolbar-spacer {
+    margin-left: auto;
+    color: var(--text-secondary);
+}
+
+.futures-shell .chart-area {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(180deg, rgba(24, 26, 32, 1) 0%, rgba(11, 14, 17, 1) 100%);
+    overflow: hidden;
+    min-height: 360px;
+    height: 100%;
+}
+
+.futures-shell #candles-container {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.futures-shell .y-axis {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 10px 5px 10px 0;
+    align-items: flex-end;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
+
+.futures-shell .axis-price-pill {
+    background: var(--color-up);
+    color: var(--bg-base);
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-weight: bold;
+}
+
+.futures-shell .x-axis {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 60px;
+    height: 20px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
+
+.futures-shell .bottom-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-panel);
+}
+
+.futures-shell .tabs {
+    height: 40px;
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 16px;
+    gap: 20px;
+    overflow-x: auto;
+}
+
+.futures-shell .tab {
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    position: relative;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    padding: 0 0 10px;
+    border: none;
+    background: transparent;
+}
+
+.futures-shell .tab.active {
+    color: var(--text-primary);
+}
+
+.futures-shell .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #0ecb81;
+}
+
+.futures-shell .panel-content {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    color: var(--text-secondary);
+    font-weight: 500;
+    padding: 12px 16px;
+    overflow: auto;
+}
+
+.futures-shell .futures-positions-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.futures-shell .future-position-row {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 0.8fr;
+    gap: 8px;
+    align-items: center;
+}
+
+.futures-shell .future-position-row.long {
+    border-left: 3px solid var(--color-up);
+}
+
+.futures-shell .future-position-row.short {
+    border-left: 3px solid var(--color-down);
+}
+
+.futures-shell .right-section {
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.futures-shell .orderbook-panel {
+    flex: 1;
+    min-height: 350px;
+}
+
+.futures-shell .orderentry-panel {
+    min-height: 400px;
+    padding: 12px;
+}
+
+.futures-shell .account-panel {
+    height: 150px;
+    padding: 12px;
+}
+
+.futures-shell .ob-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    font-weight: 500;
+}
+
+.futures-shell .ob-icons span {
+    margin-left: 8px;
+    color: var(--text-secondary);
+}
+
+.futures-shell .ob-table {
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.8;
+}
+
+.futures-shell .ob-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 0 16px;
+}
+
+.futures-shell .ob-table th {
+    color: var(--text-secondary);
+    font-weight: normal;
+    text-align: right;
+    padding: 4px 0;
+}
+
+.futures-shell .ob-table th:first-child {
+    text-align: left;
+}
+
+.futures-shell .ob-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.8;
+}
+
+.futures-shell .ob-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 0 16px;
+    cursor: pointer;
+    position: relative;
+}
+
+.futures-shell .ob-row span {
+    z-index: 1;
+}
+
+.futures-shell .ob-row span:nth-child(2),
+.futures-shell .ob-row span:nth-child(3),
+.futures-shell .ob-row span:nth-child(4) {
+    text-align: right;
+}
+
+.futures-shell .ob-row span:nth-child(2) {
+    text-align: left;
+}
+
+.futures-shell .ob-row.ask span:nth-child(2) {
+    color: var(--color-down);
+}
+
+.futures-shell .ob-row.bid span:nth-child(2) {
+    color: var(--color-up);
+}
+
+.futures-shell .depth-bar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.15;
+}
+
+.futures-shell .ob-row.ask .depth-bar {
+    background-color: var(--color-down);
+}
+
+.futures-shell .ob-row.bid .depth-bar {
+    background-color: var(--color-up);
+}
+
+.futures-shell .ob-center {
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    margin: 4px 0;
+}
+
+.futures-shell .ob-center .price {
+    font-size: 16px;
+    color: var(--color-down);
+    font-weight: bold;
+}
+
+.futures-shell .ob-center-arrow {
+    font-size: 14px;
+    margin-left: 4px;
+}
+
+.futures-shell .ob-center-mark {
+    margin-left: auto;
+}
+
+.futures-shell .oe-tabs {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.futures-shell .oe-btn-group {
+    display: flex;
+    background: var(--bg-input);
+    border-radius: 4px;
+    padding: 2px;
+}
+
+.futures-shell .oe-btn-group button {
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    border-radius: 2px;
+    font-weight: 500;
+}
+
+.futures-shell .oe-btn-group button.active {
+    background: var(--bg-panel);
+    color: var(--text-primary);
+}
+
+.futures-shell .oe-type-tabs {
+    display: flex;
+    gap: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+
+.futures-shell .oe-type-tabs span.active {
+    color: var(--text-primary);
+}
+
+.futures-shell .input-group {
+    background: var(--bg-input);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    height: 40px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    border: 1px solid transparent;
+    transition: border 0.2s;
+}
+
+.futures-shell .input-group label {
+    color: var(--text-secondary);
+    width: 40px;
+}
+
+.futures-shell .input-group input {
+    flex: 1;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: right;
+    padding: 0 8px;
+    font-family: var(--font-mono);
+}
+
+.futures-shell .input-group .unit {
+    color: var(--text-secondary);
+}
+
+.futures-shell .slider-container {
+    padding: 10px 0 20px 0;
+    position: relative;
+}
+
+.futures-shell .slider-track {
+    height: 4px;
+    background: var(--bg-input);
+    border-radius: 2px;
+    position: relative;
+}
+
+.futures-shell .slider-fill {
+    width: 0%;
+    height: 100%;
+    background: #0ecb81;
+    border-radius: 2px;
+}
+
+.futures-shell .slider-thumb {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #0ecb81;
+    border: 2px solid var(--bg-panel);
+    border-radius: 50%;
+    top: -4px;
+    left: 0%;
+    transform: translateX(-50%);
+    cursor: pointer;
+}
+
+.futures-shell .slider-marks {
+    display: flex;
+    justify-content: space-between;
+    position: absolute;
+    width: 100%;
+    top: 12px;
+    color: var(--text-secondary);
+    font-size: 10px;
+}
+
+.futures-shell .checkbox-group {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+}
+
+.futures-shell .checkbox-group input {
+    accent-color: #0ecb81;
+    width: 14px;
+    height: 14px;
+}
+
+.futures-shell .tp-sl-fields.hidden {
+    display: none;
+}
+
+.futures-shell .action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.futures-shell .btn-buy {
+    flex: 1;
+    height: 40px;
+    background-color: var(--color-up);
+    color: white;
+    font-weight: bold;
+    border-radius: 4px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.futures-shell .btn-sell {
+    flex: 1;
+    height: 40px;
+    background-color: var(--color-down);
+    color: white;
+    font-weight: bold;
+    border-radius: 4px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.futures-shell .acc-header {
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.futures-shell .acc-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.futures-shell .acc-row .val {
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.futures-shell .acc-row .green {
+    color: var(--color-up);
+}
+
+.futures-shell .acc-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.futures-shell .acc-btn,
+.futures-shell .acc-btn-full {
+    flex: 1;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    height: 32px;
+    border-radius: 4px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+}
+
+.futures-shell .acc-btn-full {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.futures-shell .footer {
+    height: 30px;
+    background-color: var(--bg-panel);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    justify-content: space-between;
+}
+
+.futures-shell .footer-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.futures-shell .connection {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-up);
+}
+
+.futures-shell .connection .dot {
+    width: 6px;
+    height: 6px;
+    background-color: var(--color-up);
+    border-radius: 50%;
+}
+
+.futures-shell .ticker-tape span {
+    color: var(--text-primary);
+}
+
+.futures-shell .ticker-tape .green {
+    color: var(--color-up);
+}
+
+.futures-shell .ticker-tape .red {
+    color: var(--color-down);
+}
+
+.futures-shell .footer-right {
+    display: flex;
+    gap: 16px;
+}
+
+@media (max-width: 1200px) {
+    .futures-shell .right-col {
+        width: 280px;
+    }
+}
+
+@media (max-width: 980px) {
+    .futures-shell .main-content {
+        flex-direction: column;
+    }
+    .futures-shell .right-col {
+        width: 100%;
+    }
+}

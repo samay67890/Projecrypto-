@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="{% url 'favicon' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusCrypto - Verify OTP</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/verify_otp.css' %}" type="text/css" media="all">
+</head>
+<body>
+
+<div class="container">
+    <div class="left-side">
+        <div class="brand-heading"><i class="fas fa-bolt"></i> NexusCrypto</div>
+        <div class="hero-title">Verify your<br><span class="gradient-text">Identity</span></div>
+        <div class="hero-subtitle">One step away from your $50 reward.</div>
+    </div>
+
+    <div class="right-side">
+        <div class="form-container">
+            <h2>Enter Verification Code</h2>
+            <p class="subtitle">We've sent a 6-digit code to<br><b>{{ email }}</b></p>
+            {% if debug_otp %}<p class="subtitle" style="margin-top:8px;color:#ffd166;">Dev OTP: <b>{{ debug_otp }}</b></p>{% endif %}
+
+            <form action="{% url 'signup_verify_otp' %}" method="post" id="verify-otp-form">
+                {% csrf_token %}
+                <input type="hidden" name="otp" id="otp-value" value="">
+                {% if error %}
+                    <div class="form-error">{{ error }}</div>
+                {% endif %}
+                <div class="otp-wrapper" id="otp-inputs">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                </div>
+
+                <button type="submit" class="btn-primary">Verify & Create Account</button>
+            </form>
+
+            <p class="resend-text">Didn't receive code? <a href="{% url 'signup_resend_otp' %}">Resend Code</a></p>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/verify_otp.js' %}"></script>
+</body>
+</html>
+

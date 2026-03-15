@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&display=swap');
+
+:root {
+    --bg: #000000;
+    --accent: #9b51e0;
+    --apple-glass: rgba(255, 255, 255, 0.05);
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background-color: var(--bg);
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reveal-container {
+    text-align: center;
+    z-index: 10;
+}
+
+.hello-text {
+    font-size: 24px;
+    font-weight: 500;
+    color: #888888;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.8s forwards 0.5s;
+}
+
+.user-name {
+    font-size: 72px;
+    font-weight: 700;
+    margin: 10px 0;
+    letter-spacing: -2px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.8s forwards 0.8s;
+}
+
+.bonus-badge {
+    display: inline-block;
+    padding: 10px 25px;
+    border-radius: 50px;
+    background: linear-gradient(90deg, #9b51e0, #e91e63);
+    font-weight: 600;
+    font-size: 18px;
+    margin-top: 20px;
+    box-shadow: 0 0 40px rgba(155, 81, 224, 0.5);
+    opacity: 0;
+    transform: scale(0.8);
+    animation: popIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards 1.2s;
+}
+
+.arrow-link {
+    margin-top: 60px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: #ffffff;
+    text-decoration: none;
+    opacity: 0;
+    animation: fadeIn 1s forwards 2s;
+}
+
+.arrow-link i {
+    font-size: 30px;
+    transition: 0.3s;
+    animation: bounce 2s infinite;
+}
+
+.arrow-link:hover i {
+    color: #9b51e0;
+}
+
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes popIn {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes bounce {
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+.glow {
+    position: absolute;
+    width: 40vw;
+    height: 40vw;
+    background: radial-gradient(circle, rgba(155, 81, 224, 0.15) 0%, transparent 70%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    html,
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+        align-items: flex-start;
+    }
+
+    .reveal-container {
+        padding: 80px 20px 40px;
+    }
+
+    .user-name {
+        font-size: 42px;
+        letter-spacing: -1px;
+    }
+
+    .bonus-badge {
+        font-size: 16px;
+        padding: 8px 20px;
+    }
+}
+

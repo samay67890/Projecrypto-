@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="{% url 'favicon' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Nexus</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/welcome.css' %}" type="text/css" media="all">
+</head>
+<body>
+    <div class="glow"></div>
+    <div class="reveal-container">
+        <div class="hello-text">Welcome to the future</div>
+        <div class="user-name">
+            Hello, {{ request.user.first_name|default:request.user.email }}.
+        </div>
+        <div class="bonus-badge">$50.00 Bonus Credited</div>
+
+        <a href="{% url 'dashboard' %}" class="arrow-link">
+            <span>Explore Dashboard</span>
+            <i class="fas fa-chevron-down"></i>
+        </a>
+    </div>
+
+    <script src="{% static 'js/welcome.js' %}"></script>
+</body>
+</html>
+

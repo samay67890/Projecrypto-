@@ -1,0 +1,113 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="{% url 'favicon' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Pro | Deposit Methods</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/deposit_methods.css' %}">
+</head>
+<body>
+    <header class="header">
+        <div class="logo"><i class="fas fa-bolt"></i> NEXUS PRO</div>
+        <div class="header-right">
+            <span>NETWORK STATUS: <strong>SECURE</strong></span>
+            <a class="back-link" href="{% url 'dashboard' %}">Back to Dashboard</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="methodSearch" class="search-bar" placeholder="Search bank, wallet or crypto...">
+        </div>
+
+        <section class="method-section">
+            <h2 class="category-title">India Local Gateways</h2>
+            <div class="method-grid">
+                <button class="method-card" type="button" data-name="UPI / PhonePe" data-type="qr"><i class="fas fa-qrcode"></i><span>UPI</span></button>
+                <button class="method-card" type="button" data-name="HDFC Bank" data-type="bank"><i class="fas fa-building-columns"></i><span>HDFC</span></button>
+                <button class="method-card" type="button" data-name="ICICI Bank" data-type="bank"><i class="fas fa-university"></i><span>ICICI</span></button>
+                <button class="method-card" type="button" data-name="State Bank of India" data-type="bank"><i class="fas fa-landmark"></i><span>SBI</span></button>
+            </div>
+        </section>
+
+        <section class="method-section">
+            <h2 class="category-title">Digital Wallets and Global</h2>
+            <div class="method-grid">
+                <button class="method-card" type="button" data-name="PayPal" data-type="qr"><i class="fab fa-paypal"></i><span>PayPal</span></button>
+                <button class="method-card" type="button" data-name="Apple Pay" data-type="qr"><i class="fab fa-apple-pay"></i><span>Apple Pay</span></button>
+                <button class="method-card" type="button" data-name="Google Pay" data-type="qr"><i class="fab fa-google-pay"></i><span>Google Pay</span></button>
+            </div>
+        </section>
+
+        <section class="method-section">
+            <h2 class="category-title">Cryptocurrency</h2>
+            <div class="method-grid">
+                <button class="method-card" type="button" data-name="Bitcoin (BTC)" data-type="qr"><i class="fab fa-bitcoin"></i><span>Bitcoin</span></button>
+                <button class="method-card" type="button" data-name="Ethereum (ETH)" data-type="qr"><i class="fab fa-ethereum"></i><span>Ethereum</span></button>
+            </div>
+        </section>
+    </main>
+
+    <div id="gatewayOverlay" class="overlay" aria-hidden="true">
+        <div class="gateway-window">
+            <section id="stepAmount" class="step active">
+                <h3>Select Amount</h3>
+                <div class="amount-chips">
+                    <button class="chip" type="button" data-amt="100">$100</button>
+                    <button class="chip" type="button" data-amt="500">$500</button>
+                    <button class="chip" type="button" data-amt="2500">$2,500</button>
+                    <button class="chip" type="button" data-amt="10000">$10,000</button>
+                </div>
+                <input type="number" id="customInput" class="custom-amount" placeholder="0.00" min="0">
+                <button id="confirmAmountBtn" class="btn btn-primary" type="button">Confirm Amount</button>
+                <button class="cancel-link" type="button" data-close-overlay>Cancel</button>
+            </section>
+
+            <section id="stepLoading" class="step">
+                <div class="center-box">
+                    <div class="loader"></div>
+                    <h3>Secure Connection</h3>
+                    <p>Establishing encrypted link...</p>
+                </div>
+            </section>
+
+            <section id="stepPay" class="step">
+                <div class="center-title">
+                    <span id="activeMethod"></span>
+                    <h2>$<span id="dispAmt"></span></h2>
+                </div>
+                <div id="dynamicArea" class="dynamic-area"></div>
+                <button id="payNowBtn" class="btn btn-primary" type="button">Pay Now</button>
+                <button class="cancel-link" type="button" data-close-overlay>Cancel Payment</button>
+            </section>
+
+            <section id="stepSuccess" class="step">
+                <div class="center-box">
+                    <div class="success-circle"><i class="fas fa-check"></i></div>
+                    <h3>Deposit Received</h3>
+                    <p>Your $<span id="finalAmt"></span> deposit is successful.</p>
+                    <button class="btn btn-dark" type="button" data-close-overlay>Return Home</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        window.nexusBootstrap = {
+            initialUSDT: 1000000,
+            userLabel: "{{ request.user.first_name|default:request.user.email|escapejs }}",
+            userId: "{{ request.user.id|default:''|escapejs }}"
+        };
+    </script>
+    <script src="{% static 'js/deposit_methods.js' %}"></script>
+</body>
+</html>
+
+

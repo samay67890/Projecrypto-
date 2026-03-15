@@ -1,0 +1,78 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="{% url 'favicon' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusCrypto | Log In</title>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}" type="text/css" media="all" />
+</head>
+<body>
+
+    <div class="auth-container">
+        <div class="auth-marketing">
+            <div class="brand-logo">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                <span>NexusCrypto</span>
+            </div>
+
+            <div class="hero-content">
+                <h1>Welcome back to<br><span class="gradient-text">NexusCrypto</span></h1>
+                <div class="visual-box">
+                    <div class="floating-coin">N</div>
+                    <div class="glow-effect"></div>
+                </div>
+
+                <div class="trust-badges">
+                    <div class="badge-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#db2777" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        <div class="badge-text">
+                            <strong>Secure Access</strong>
+                            <span>Session protected</span>
+                        </div>
+                    </div>
+                    <div class="badge-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#db2777" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <div class="badge-text">
+                            <strong>Encrypted</strong>
+                            <span>Bank-grade security</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-form-wrapper">
+            <div class="form-card">
+                <div class="form-header">
+                    <h2>Log In</h2>
+                    <p>Access your dashboard and trading terminal.</p>
+                </div>
+
+                <form action="{% url 'login' %}" method="post" id="signin-form">
+                    {% csrf_token %}
+                    {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+                    <div class="input-group">
+                        <label for="id_email">Email</label>
+                        <input type="email" name="email" id="id_email" placeholder="name@example.com" value="{{ email }}" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="id_password">Password</label>
+                        <input type="password" name="password" id="id_password" placeholder="Enter your password" required>
+                    </div>
+
+                    <button type="submit" class="btn-submit">Log In</button>
+                </form>
+
+                <div class="footer-link">
+                    New user? <a href="{% url 'signup' %}">Create an account</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/signin.js' %}"></script>
+</body>
+</html>
+

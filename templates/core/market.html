@@ -1,0 +1,34 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="{% url 'favicon' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Pro Analytics</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/market.css' %}">
+</head>
+<body>
+    <nav>
+        <div>
+            <h1>Markets</h1>
+            <span>Live Crypto Performance</span>
+        </div>
+        <div class="nav-right">
+            <div class="market-cap-label">Market Cap</div>
+            <div class="market-cap-value">$2.48 Trillion <i class="fas fa-caret-up green"></i></div>
+            <a href="{% url 'dashboard' %}" class="back-link">Back to Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="market-container" id="marketGrid"></div>
+
+    <div id="detailOverlay">
+        <div class="detail-content" id="detailContent"></div>
+    </div>
+
+    <script src="{% static 'js/market.js' %}"></script>
+</body>
+</html>
+

@@ -1,0 +1,793 @@
+#view-margin {
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.margin-terminal {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: calc(100vh - 110px);
+    background: #0b0e11;
+    border: 1px solid #20252c;
+    overflow: hidden;
+}
+
+.margin-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #20252c;
+    background: #181a20;
+}
+
+.margin-pair {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.margin-pair-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #f0b90b;
+    color: #0b0e11;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.margin-pair-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.margin-pair-sub {
+    color: #848e9c;
+    font-size: 11px;
+}
+
+.margin-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(240, 185, 11, 0.12);
+    color: #f0b90b;
+}
+
+.margin-stats {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.margin-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+    text-align: right;
+}
+
+.margin-stat .label {
+    color: #848e9c;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.margin-stat .value {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.margin-body {
+    display: flex;
+    gap: 1px;
+    background: #20252c;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.margin-orderbook,
+.margin-main,
+.margin-right {
+    background: #0b0e11;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.margin-orderbook {
+    width: 270px;
+    flex: 0 0 270px;
+    border-right: 1px solid #20252c;
+}
+
+.margin-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.margin-right {
+    width: 320px;
+    flex: 0 0 320px;
+    border-left: 1px solid #20252c;
+}
+
+.margin-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid #20252c;
+    font-weight: 700;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.icon-btn {
+    border: none;
+    background: #14181f;
+    color: #848e9c;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.icon-btn:hover {
+    color: #fff;
+}
+
+.margin-ob-head {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 8px 12px;
+    color: #848e9c;
+    font-size: 11px;
+    border-bottom: 1px solid #20252c;
+}
+
+.margin-ob-scroll {
+    flex: 1;
+    overflow: auto;
+}
+
+.margin-ob-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+}
+
+.margin-ob-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.margin-ob-row::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: var(--depth, 0%);
+    background: rgba(0, 192, 118, 0.12);
+    z-index: 0;
+    transition: width 0.25s ease;
+}
+
+.margin-ob-row.sell::before {
+    background: rgba(255, 77, 79, 0.12);
+}
+
+.margin-ob-row.best {
+    box-shadow: inset 0 0 0 1px rgba(240, 185, 11, 0.5);
+}
+
+.margin-ob-row span {
+    position: relative;
+    z-index: 1;
+}
+
+.margin-ob-row.buy {
+    color: #00c076;
+}
+
+.margin-ob-row.sell {
+    color: #ff4d4f;
+}
+
+.margin-mid-price {
+    padding: 10px 12px;
+    border-top: 1px solid #20252c;
+    border-bottom: 1px solid #20252c;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.margin-mid-price .sub {
+    color: #848e9c;
+    font-size: 11px;
+    margin-left: 6px;
+}
+
+.margin-main {
+    background: #0b0e11;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.margin-chart-panel {
+    border-bottom: 1px solid #20252c;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.margin-chart-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #20252c;
+    color: #848e9c;
+    font-size: 11px;
+}
+
+.margin-terminal .tabs-left {
+    display: flex;
+    gap: 8px;
+}
+
+.margin-terminal .tab {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 6px 8px;
+}
+
+.margin-terminal .tab.active {
+    color: #fff;
+    border-bottom: 2px solid #f0b90b;
+}
+
+.margin-chart-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 340px;
+    background: #0b0e11;
+    overflow: hidden;
+}
+
+#marginChart {
+    position: absolute;
+    inset: 0;
+}
+
+.chart-status {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(20, 24, 31, 0.8);
+    border: 1px solid #20252c;
+    color: #f0b90b;
+    font-size: 11px;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.margin-chart-wrap #marginChart,
+.margin-chart-wrap canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.margin-chart-overlay {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    background: rgba(24, 26, 32, 0.7);
+    border: 1px solid #20252c;
+    padding: 6px 8px;
+    border-radius: 8px;
+}
+
+.margin-chart-overlay .ma7 {
+    color: #f0b90b;
+}
+
+.margin-chart-overlay .ma25 {
+    color: #f06292;
+}
+
+.margin-chart-overlay .ma99 {
+    color: #5aa9ff;
+}
+
+.margin-quick-trade {
+    position: absolute;
+    bottom: 8px;
+    left: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 3;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+}
+
+.margin-quick-trade:hover {
+    opacity: 1;
+}
+
+.quick-card,
+.quick-input {
+    background: #181a20;
+    border: 1px solid #20252c;
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    min-width: 90px;
+}
+
+.quick-card.buy {
+    background: #00c076;
+    color: #0b0e11;
+    font-weight: 700;
+}
+
+.quick-card.sell {
+    background: #ff4d4f;
+    color: #0b0e11;
+    font-weight: 700;
+}
+
+.quick-input input {
+    border: none;
+    background: transparent;
+    color: #fff;
+    text-align: center;
+    outline: none;
+    font-size: 12px;
+}
+
+.margin-trade-panel {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 0 0 auto;
+}
+
+.margin-terminal .trade-tabs {
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid #20252c;
+    padding-bottom: 6px;
+    color: #848e9c;
+}
+
+.margin-terminal .trade-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.margin-terminal .trade-side {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.margin-terminal .trade-mode {
+    display: flex;
+    gap: 8px;
+}
+
+.margin-terminal .pill {
+    border: none;
+    background: #14181f;
+    color: #848e9c;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.margin-terminal .pill.active {
+    background: #1f252e;
+    color: #fff;
+}
+
+.margin-terminal .trade-field label {
+    display: block;
+    font-size: 11px;
+    color: #848e9c;
+    margin-bottom: 4px;
+}
+
+.margin-terminal .field-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #181a20;
+    border: 1px solid #20252c;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.margin-terminal .field-input.readonly {
+    border-color: #f0b90b;
+}
+
+.margin-terminal .field-input input {
+    border: none;
+    background: transparent;
+    color: #fff;
+    width: 100%;
+    outline: none;
+    font-size: 12px;
+    text-align: right;
+}
+
+.margin-terminal .trade-range {
+    width: 100%;
+}
+
+.margin-terminal .trade-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.margin-terminal .trade-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #848e9c;
+    font-size: 12px;
+}
+
+.leverage-choices {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.lev-btn {
+    border: 1px solid #20252c;
+    background: #14181f;
+    color: #848e9c;
+    padding: 6px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.lev-btn.active {
+    border-color: #f0b90b;
+    color: #fff;
+}
+
+.margin-metrics {
+    border: 1px solid #20252c;
+    border-radius: 10px;
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+    font-size: 11px;
+    color: #848e9c;
+}
+
+.margin-metrics .metric-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.margin-terminal .positions-wrap {
+    background: #14181f;
+    border: 1px solid #20252c;
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.margin-terminal .position-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.margin-terminal .positions-list {
+    max-height: 180px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.margin-terminal .position-item {
+    border: 1px solid #20252c;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    color: #848e9c;
+}
+
+.margin-terminal .position-item.long,
+.margin-terminal .position-item.short {
+    color: #eaecef;
+}
+
+.margin-terminal .btn-buy,
+.margin-terminal .btn-sell {
+    border: none;
+    padding: 10px 0;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: filter 0.15s;
+}
+
+.margin-terminal .btn-buy {
+    background: #00c076;
+    color: #0b0e11;
+}
+
+.margin-terminal .btn-sell {
+    background: #ff4d4f;
+    color: #0b0e11;
+}
+
+.margin-terminal .btn-buy:hover,
+.margin-terminal .btn-sell:hover {
+    filter: brightness(1.1);
+}
+
+.margin-terminal .mini-btn {
+    border: 1px solid #f0b90b;
+    background: rgba(240, 185, 11, 0.1);
+    color: #f0b90b;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.margin-terminal .outline-btn {
+    border: 1px solid #20252c;
+    background: transparent;
+    color: #848e9c;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.margin-terminal .outline-btn:hover {
+    border-color: #f0b90b;
+    color: #f0b90b;
+}
+
+.margin-right {
+    border-left: 1px solid #20252c;
+}
+
+.margin-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #20252c;
+}
+
+.margin-search input {
+    border: none;
+    background: transparent;
+    color: #fff;
+    width: 100%;
+    outline: none;
+    font-size: 12px;
+}
+
+.margin-market-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #20252c;
+}
+
+.margin-market-table,
+.margin-trades {
+    flex: 1;
+    overflow: auto;
+}
+
+.margin-market-table table,
+.margin-trades table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.margin-market-table th,
+.margin-market-table td,
+.margin-trades th,
+.margin-trades td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #20252c;
+}
+
+.margin-market-table tbody tr {
+    cursor: pointer;
+}
+
+.margin-market-table tbody tr:hover {
+    background: #14181f;
+}
+
+.margin-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-top: 1px solid #20252c;
+    background: #181a20;
+}
+
+.footer-tabs {
+    display: flex;
+    gap: 10px;
+    color: #848e9c;
+}
+
+.footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #848e9c;
+    font-size: 11px;
+}
+
+.footer-actions button {
+    background: transparent;
+    border: none;
+    color: #f0b90b;
+    cursor: pointer;
+}
+
+.margin-orders-panel {
+    border-top: 1px solid #20252c;
+    background: #0b0e11;
+    padding: 8px 12px 12px;
+    flex: 0 0 auto;
+}
+
+.margin-orders-table {
+    display: none;
+    max-height: 220px;
+    overflow: auto;
+}
+
+.margin-orders-table.active {
+    display: block;
+}
+
+.margin-orders-table td[colspan] {
+    color: #848e9c;
+    text-align: center;
+    padding: 18px;
+    font-size: 12px;
+}
+
+.margin-orders-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.margin-orders-table th,
+.margin-orders-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #20252c;
+}
+
+.margin-orders-table button {
+    border: none;
+    background: #14181f;
+    color: #f0b90b;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.right {
+    text-align: right;
+}
+
+.muted {
+    color: #848e9c;
+    font-size: 11px;
+}
+
+@media (max-width: 1280px) {
+    .margin-orderbook {
+        width: 240px;
+        flex-basis: 240px;
+    }
+    .margin-right {
+        display: none;
+    }
+}
+
+@media (max-width: 980px) {
+    .margin-body {
+        flex-direction: column;
+    }
+    .margin-orderbook {
+        width: 100%;
+        flex-basis: auto;
+        border-right: none;
+        border-bottom: 1px solid #20252c;
+    }
+    .margin-right {
+        display: none;
+    }
+    .margin-terminal .trade-grid {
+        grid-template-columns: 1fr;
+    }
+    .margin-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .margin-stats {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+

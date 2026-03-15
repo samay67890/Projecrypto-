@@ -1,0 +1,70 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .exchange-dashboard {
+    margin: 8px 0 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .metric-card {
+    background: #ffffff;
+    border: 1px solid #d6d6d6;
+    border-radius: 8px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+  .metric-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #6b7280;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+  }
+  .metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.1;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{% trans "Exchange Control Center" %}</h1>
+<div class="exchange-dashboard">
+  <div class="metric-card">
+    <div class="metric-label">{% trans "Total Users" %}</div>
+    <div class="metric-value">{{ exchange_metrics.total_users }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">{% trans "Total Trades" %}</div>
+    <div class="metric-value">{{ exchange_metrics.total_trades }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">{% trans "Total Transactions" %}</div>
+    <div class="metric-value">{{ exchange_metrics.total_transactions }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">{% trans "Platform Trading Volume" %}</div>
+    <div class="metric-value">{{ exchange_metrics.total_volume }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">{% trans "Active Coins" %}</div>
+    <div class="metric-value">{{ exchange_metrics.active_coins }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">{% trans "Pending KYC" %}</div>
+    <div class="metric-value">{{ exchange_metrics.pending_kyc }}</div>
+  </div>
+</div>
+
+{% if app_list %}
+  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+{% else %}
+  <p>{% trans "You do not have permission to view or edit anything." %}</p>
+{% endif %}
+{% endblock %}

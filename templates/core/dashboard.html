@@ -1,0 +1,977 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Pro | Advanced Trading Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard_overview.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard_margin.css' %}">
+    <link rel="stylesheet" href="{% static 'css/futures.css' %}">
+</head>
+<body>
+    <div class="app-wrapper">
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo"><i class="fas fa-bolt"></i> NEXUS PRO</div>
+                <button class="nav-item active" data-view="overview">Overview</button>
+                <button class="nav-item" data-view="trade">Trade</button>
+                <button class="nav-item" data-view="margin">Margin</button>
+                <button class="nav-item" data-view="futures">Futures</button>
+                <button class="nav-item" data-view="earn">Earn</button>
+            </div>
+            <div class="header-right">
+                <div class="search-container" id="coinSearchContainer">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="globalCoinSearch" placeholder="Search 100+ coins or pair...">
+                    <div class="search-results" id="searchResults"></div>
+                </div>
+                <i class="far fa-bell nav-icon"></i>
+                <button class="profile-trigger" id="profileTrigger">
+                    {{ request.user.first_name|default:request.user.email|slice:":2"|upper }}
+                </button>
+            </div>
+        </header>
+
+        <div class="main-layout">
+            <aside class="sidebar">
+                <div class="side-label">Navigation</div>
+                <button class="side-link active" data-view="overview"><i class="fas fa-th-large"></i> Overview</button>
+                <button class="side-link" data-view="trade"><i class="fas fa-chart-pie"></i> Trade</button>
+                <button class="side-link" data-view="fiat"><i class="fas fa-wallet"></i> Fiat & Spot</button>
+                <button class="side-link" data-view="margin"><i class="fas fa-bolt"></i> Margin</button>
+                <button class="side-link" data-view="futures"><i class="fas fa-layer-group"></i> Futures</button>
+                <button class="side-link" data-view="history"><i class="fas fa-clock-rotate-left"></i> Trade History</button>
+                <button class="side-link" data-view="earn"><i class="fas fa-piggy-bank"></i> Staking & Earn</button>
+
+                <div class="side-label">Personal</div>
+                <button class="side-link" data-view="security"><i class="fas fa-shield-alt"></i> Security</button>
+                <button class="side-link" data-view="identification"><i class="fas fa-id-card"></i> Identification</button>
+                <button class="side-link" data-view="api"><i class="fas fa-key"></i> API Keys</button>
+            </aside>
+
+            <main class="content-area">
+                <section class="dashboard-view active" id="view-overview">
+                    {% include "core/partials/dashboard_overview.html" %}
+                </section>
+
+                <section class="dashboard-view" id="view-trade">
+                    <div class="workspace">
+                        <div class="panel">
+                            <div class="pair-info">
+                                <img id="pairLogo" src="https://cryptologos.cc/logos/bitcoin-btc-logo.png" width="30" alt="BTC">
+                                <div>
+                                    <div class="pair-title"><span id="pairSymbolText">BTC / USDT</span> <span id="pairNameText">Bitcoin</span></div>
+                                    <div class="price-up" id="livePrice">$64,321.00 <span id="liveChange">+0.00%</span></div>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="priceChartCanvas"></canvas>
+                            </div>
+                            <div class="summary-cards">
+                                <div class="summary-card">
+                                    <label>Wallet (USDT)</label>
+                                    <strong data-balance-usdt>1000000.00</strong>
+                                </div>
+                                <div class="summary-card">
+                                    <label>Wallet (<span id="walletCoinSymbol">BTC</span>)</label>
+                                    <strong data-balance-btc>0.000000</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel panel-border">
+                            <div class="ob-header"><span>Price (USDT)</span> <span>Amount</span></div>
+                            <div id="liveOrderAsks" class="order-list"></div>
+                            <div class="mid-price" id="livePairPrice">$64,321.00</div>
+                            <div id="liveOrderBids" class="order-list"></div>
+                        </div>
+
+                        <div class="panel panel-border">
+                            <div class="trade-tabs">
+                                <button class="tab active">Spot</button>
+                                <button class="tab">Cross 5x</button>
+                                <button class="tab">Isolated</button>
+                            </div>
+
+                            <div class="trade-meta">
+                                <span>Available</span>
+                                <span><span data-balance-usdt>1000000.00</span> USDT</span>
+                            </div>
+
+                            <div class="input-box">
+                                <label>Price</label>
+                                <input id="spotPriceInput" type="number" value="64321.00" step="0.01">
+                                <span>USDT</span>
+                            </div>
+
+                            <div class="input-box">
+                                <label>Amount (<span id="spotAmountSymbol">BTC</span>)</label>
+                                <input id="spotAmountInput" type="number" placeholder="0.00" step="0.000001" min="0">
+                                <span id="spotUnitSymbol">BTC</span>
+                            </div>
+
+                            <input id="spotRange" type="range" min="0" max="100" value="0">
+
+                            <button id="buyBtn" class="btn-buy">Buy</button>
+                            <button id="sellBtn" class="btn-sell">Sell</button>
+
+                            <div class="pnl-card">
+                                <div class="small-label">Estimated Assets</div>
+                                <div class="assets-value" id="estimatedAssets">$1,000,000.00</div>
+                                <div class="pnl-value" id="todaysPnl">Today PnL: $0.00</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-fiat">
+                    <div class="fiat-spot-view">
+                        <div class="fiat-balance-card">
+                            <div class="glow-orb"></div>
+                            <span>Fiat and Spot Balance</span>
+                            <h1>$<span data-balance-usdt>1000000.00</span> <small>~ <span data-balance-btc>0.000000</span> <span id="fiatCoinSymbol">BTC</span></small></h1>
+                            <div class="fiat-actions">
+                                <button class="gradient-btn deposit-btn" type="button" data-deposit-url="{% url 'deposit_methods' %}">Deposit</button>
+                                <button class="outline-btn">Withdraw</button>
+                            </div>
+                        </div>
+
+                        <div class="asset-table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Asset</th>
+                                        <th>Total Balance</th>
+                                        <th>Available</th>
+                                        <th>In Order</th>
+                                        <th class="right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="asset-cell">
+                                            <div class="asset-icon usdt"><i class="fas fa-dollar-sign"></i></div>
+                                            <b>USDT <span>Tether</span></b>
+                                        </td>
+                                        <td><span data-balance-usdt>1000000.00</span> USDT</td>
+                                        <td><span data-balance-usdt>1000000.00</span> USDT</td>
+                                        <td>0.00</td>
+                                        <td class="right action-link" data-view="margin">Trade</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="asset-cell">
+                                            <div class="asset-icon btc"><i class="fab fa-bitcoin"></i></div>
+                                            <b><span id="assetCoinSymbol">BTC</span> <span id="assetCoinName">Bitcoin</span></b>
+                                        </td>
+                                        <td><span data-balance-btc>0.000000</span> <span id="assetCoinSymbol2">BTC</span></td>
+                                        <td><span data-balance-btc>0.000000</span> <span id="assetCoinSymbol3">BTC</span></td>
+                                        <td>0.00</td>
+                                        <td class="right action-link deposit-link" data-deposit-url="{% url 'deposit_methods' %}" role="button" tabindex="0">Deposit</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-margin">
+                    <div class="margin-terminal">
+                        <div class="margin-topbar">
+                            <div class="margin-pair">
+                                <div class="margin-pair-icon">B</div>
+                                <div class="margin-pair-meta">
+                                    <div class="margin-pair-title">
+                                        <span id="marginPairLabel">BTCUSDT</span>
+                                        <span class="margin-pill" id="marginLeveragePill">20x</span>
+                                    </div>
+                                    <div class="margin-pair-sub">Bitcoin Price</div>
+                                </div>
+                            </div>
+                            <div class="margin-stats">
+                                <div class="margin-stat">
+                                    <span class="label">Last Price</span>
+                                    <span class="value" id="marginLivePrice">$64,321.00 (+0.00%)</span>
+                                </div>
+                                <div class="margin-stat">
+                                    <span class="label">Available USDT</span>
+                                    <span class="value"><span data-balance-usdt>1000000.00</span> USDT</span>
+                                </div>
+                                <div class="margin-stat">
+                                    <span class="label">Available <span id="marginAssetSymbol">BTC</span></span>
+                                    <span class="value"><span data-balance-btc>0.000000</span> <span id="marginAssetSymbol2">BTC</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="margin-body">
+                            <aside class="margin-orderbook">
+                                <div class="margin-panel-head">
+                                    <span>Order Book</span>
+                                    <div class="panel-actions">
+                                        <button type="button" class="icon-btn"><i class="fas fa-layer-group"></i></button>
+                                        <button type="button" class="icon-btn"><i class="fas fa-wave-square"></i></button>
+                                    </div>
+                                </div>
+                                <div class="margin-ob-head">
+                                    <span>Price(USDT)</span>
+                                    <span class="right">Amount</span>
+                                    <span class="right">Total</span>
+                                </div>
+                                <div class="margin-ob-scroll">
+                                    <div id="marginOrderAsks" class="margin-ob-list"></div>
+                                </div>
+                                <div class="margin-mid-price">
+                                    <span id="marginMidPrice">64,321.00</span>
+                                    <span class="sub">Market</span>
+                                </div>
+                                <div class="margin-ob-scroll">
+                                    <div id="marginOrderBids" class="margin-ob-list"></div>
+                                </div>
+                            </aside>
+
+                            <section class="margin-main">
+                                <div class="margin-chart-panel">
+                                    <div class="margin-chart-tabs">
+                                        <div class="tabs-left">
+                                            <button class="tab active" type="button">Chart</button>
+                                            <button class="tab" type="button">Info</button>
+                                            <button class="tab" type="button">Trading Data</button>
+                                            <button class="tab" type="button">Square</button>
+                                        </div>
+                                        <div class="tabs-right">Time: 15m 1h 4h 1D 1W</div>
+                                    </div>
+                                    <div class="margin-chart-wrap">
+                                        <div id="marginChart" class="margin-tradingview"></div>
+                                        <div class="margin-chart-overlay">
+                                            <span class="ma ma7" id="marginMA7">MA(7): 0.00</span>
+                                            <span class="ma ma25" id="marginMA25">MA(25): 0.00</span>
+                                            <span class="ma ma99" id="marginMA99">MA(99): 0.00</span>
+                                        </div>
+                                        <div class="margin-quick-trade">
+                                            <div class="quick-card buy">
+                                                <span class="label">Market Buy</span>
+                                                <span class="value" id="marginMarketBuy">0.00</span>
+                                            </div>
+                                            <div class="quick-input">
+                                                <span class="label">Amount(BTC)</span>
+                                                <input id="marginQuickAmount" type="text" placeholder="Enter Amount">
+                                            </div>
+                                            <div class="quick-card sell">
+                                                <span class="label">Market Sell</span>
+                                                <span class="value" id="marginMarketSell">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="margin-trade-panel">
+                                    <div class="trade-tabs">
+                                        <button class="tab active" type="button">Spot</button>
+                                        <button class="tab" type="button">Cross</button>
+                                        <button class="tab" type="button">Isolated</button>
+                                        <button class="tab" type="button">Grid</button>
+                                    </div>
+                                    <div class="trade-grid">
+                                        <div class="trade-side">
+                                            <div class="trade-mode">
+                                                <button class="pill active" type="button">Market</button>
+                                                <button class="pill" type="button">Limit</button>
+                                                <button class="pill" type="button">Stop Limit</button>
+                                            </div>
+                                            <div class="trade-field">
+                                                <label>Price</label>
+                                                <div class="field-input readonly">
+                                                    <input id="marginPriceInput" type="number" value="64321.00" step="0.01">
+                                                    <span>USDT</span>
+                                                </div>
+                                            </div>
+                                            <div class="trade-field">
+                                                <label>Amount</label>
+                                                <div class="field-input">
+                                                    <input id="marginAmountInput" type="number" placeholder="Amount" step="0.000001" min="0">
+                                                    <span>BTC</span>
+                                                </div>
+                                            </div>
+                                            <input id="marginRange" class="trade-range" type="range" min="1" max="50" value="20">
+                                            <div class="trade-actions">
+                                                <button id="openLongBtn" class="btn-buy" type="button">Buy BTC</button>
+                                                <button id="openShortBtn" class="btn-sell" type="button">Sell BTC</button>
+                                            </div>
+                                        </div>
+                                        <div class="trade-side">
+                                            <div class="trade-meta">
+                                                <span>Leverage</span>
+                                                <button class="mini-btn" id="leverageBtn" type="button">20x</button>
+                                            </div>
+                                            <div class="leverage-choices">
+                                                <button type="button" class="lev-btn" data-lev="1">1x</button>
+                                                <button type="button" class="lev-btn" data-lev="5">5x</button>
+                                                <button type="button" class="lev-btn" data-lev="10">10x</button>
+                                                <button type="button" class="lev-btn active" data-lev="20">20x</button>
+                                            </div>
+                                            <div class="trade-meta">
+                                                <span>Available</span>
+                                                <span><span data-balance-usdt>1000000.00</span> USDT</span>
+                                            </div>
+                                            <div class="margin-metrics">
+                                                <div class="metric-row">
+                                                    <span>Margin Ratio</span>
+                                                    <span id="marginRatio">0.00%</span>
+                                                </div>
+                                                <div class="metric-row">
+                                                    <span>Liquidation Price</span>
+                                                    <span id="marginLiq">$0.00</span>
+                                                </div>
+                                                <div class="metric-row">
+                                                    <span>Borrowed</span>
+                                                    <span id="marginBorrowed">0.000000 BTC</span>
+                                                </div>
+                                                <div class="metric-row">
+                                                    <span>Estimated PNL</span>
+                                                    <span id="marginEstPnl">$0.00</span>
+                                                </div>
+                                            </div>
+                                            <div class="positions-wrap">
+                                                <div class="position-head">
+                                                    <strong>Margin Positions</strong>
+                                                    <button id="closeAllBtn" class="outline-btn" type="button">Close All</button>
+                                                </div>
+                                                <div id="positionsList" class="positions-list"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <aside class="margin-right">
+                                <div class="margin-panel-head">
+                                    <span>Market Explorer</span>
+                                </div>
+                                <div class="margin-search">
+                                    <i class="fas fa-search"></i>
+                                    <input id="marginMarketSearch" type="text" placeholder="Search">
+                                </div>
+                                <div class="margin-market-tabs">
+                                    <button class="tab active" type="button">USDT</button>
+                                    <button class="tab" type="button">USDC</button>
+                                    <button class="tab" type="button">BNB</button>
+                                    <button class="tab" type="button">BTC</button>
+                                </div>
+                                <div class="margin-market-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Pair</th>
+                                                <th class="right">Price</th>
+                                                <th class="right">Change</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="marginMarketList"></tbody>
+                                    </table>
+                                </div>
+
+                                <div class="margin-panel-head">
+                                    <span>Market Trades</span>
+                                    <span class="muted">My Trades</span>
+                                </div>
+                                <div class="margin-trades">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Price(USDT)</th>
+                                                <th class="right">Amount(BTC)</th>
+                                                <th class="right">Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="marginTrades"></tbody>
+                                    </table>
+                                </div>
+                            </aside>
+                        </div>
+
+                        <div class="margin-footer">
+                            <div class="footer-tabs">
+                                <button class="tab active" type="button" data-margin-tab="open">Open Orders(0)</button>
+                                <button class="tab" type="button" data-margin-tab="history">Order History</button>
+                                <button class="tab" type="button" data-margin-tab="trades">Trade History</button>
+                                <button class="tab" type="button" data-margin-tab="positions">Positions</button>
+                            </div>
+                            <div class="footer-actions">
+                                <label><input type="checkbox"> Hide Other Pairs</label>
+                                <button type="button">Cancel All</button>
+                            </div>
+                        </div>
+                        <div class="margin-orders-panel">
+                            <div class="margin-orders-table active" id="marginOpenOrdersPanel">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Pair</th>
+                                            <th>Side</th>
+                                            <th class="right">Price</th>
+                                            <th class="right">Amount</th>
+                                            <th class="right">Status</th>
+                                            <th class="right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="marginOpenOrders"></tbody>
+                                </table>
+                            </div>
+                            <div class="margin-orders-table" id="marginOrderHistoryPanel">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Pair</th>
+                                            <th>Side</th>
+                                            <th class="right">Price</th>
+                                            <th class="right">Amount</th>
+                                            <th class="right">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="marginOrderHistory"></tbody>
+                                </table>
+                            </div>
+                            <div class="margin-orders-table" id="marginTradeHistoryPanel">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Pair</th>
+                                            <th>Side</th>
+                                            <th class="right">Price</th>
+                                            <th class="right">Executed</th>
+                                            <th class="right">Fee</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="marginTradeHistory"></tbody>
+                                </table>
+                            </div>
+                            <div class="margin-orders-table" id="marginPositionsPanel">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Side</th>
+                                            <th>Size</th>
+                                            <th class="right">Entry</th>
+                                            <th class="right">Leverage</th>
+                                            <th class="right">PNL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="marginPositionsTable"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-futures">
+                    <div class="futures-shell">
+                        <header class="futures-header">
+                            <div class="nav-left">
+                                <div class="logo">NEXUS <span>FUTURES</span></div>
+                                <div class="nav-links">
+                                    <a href="#" class="active">Futures</a>
+                                    <a href="#">Options</a>
+                                    <a href="#">Trading Bots</a>
+                                    <a href="#">Copy Trading</a>
+                                    <a href="#">Data</a>
+                                </div>
+                            </div>
+                            <div class="nav-right nav-icons">
+                                <span><i class="fas fa-user"></i></span>
+                                <span><i class="fas fa-briefcase"></i></span>
+                                <span><i class="fas fa-clipboard"></i></span>
+                                <span><i class="fas fa-bell"></i></span>
+                                <span><i class="fas fa-gear"></i></span>
+                            </div>
+                        </header>
+
+                        <div class="ticker-bar">
+                            <div class="ticker-symbol">
+                                <span class="star"><i class="fas fa-star"></i></span>
+                                BTCUSDT <span class="type">Perp</span>
+                            </div>
+                            <div class="ticker-price">
+                                <span class="price live-price" id="main-price">--</span>
+                                <span class="fiat">$--</span>
+                            </div>
+                            <div class="ticker-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">24h Change</span>
+                                    <span class="stat-value up" id="stat-change">--</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Mark</span>
+                                    <span class="stat-value" id="stat-mark">--</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Index</span>
+                                    <span class="stat-value" id="stat-index">--</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Funding / Countdown</span>
+                                    <span class="stat-value" id="stat-funding">--</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">24h High</span>
+                                    <span class="stat-value" id="stat-high">--</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">24h Low</span>
+                                    <span class="stat-value" id="stat-low">--</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">24h Vol(BTC)</span>
+                                    <span class="stat-value" id="stat-vol-btc">--</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">24h Vol(USDT)</span>
+                                    <span class="stat-value" id="stat-vol-usdt">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <main class="main-content">
+                            <div class="left-col">
+                                <div class="chart-section">
+                                    <div class="chart-toolbar">
+                                        <span>Time</span>
+                                        <span>1s</span>
+                                        <span>15m</span>
+                                        <span>1H</span>
+                                        <span>4H</span>
+                                        <span class="active">1D</span>
+                                        <span>1W</span>
+                                        <span><i class="fas fa-gear"></i></span>
+                                        <span class="chart-toolbar-spacer">Nexus Charts</span>
+                                    </div>
+                                    <div class="chart-area" id="chart-bg">
+                                        <div id="candles-container"></div>
+                                        <div class="y-axis">
+                                            <span>--</span>
+                                            <span>--</span>
+                                            <span>--</span>
+                                            <span>--</span>
+                                            <span class="axis-price-pill" id="axis-price">--</span>
+                                            <span>--</span>
+                                            <span>--</span>
+                                        </div>
+                                        <div class="x-axis">
+                                            <span>08/01</span>
+                                            <span>09/01</span>
+                                            <span>10/01</span>
+                                            <span>11/01</span>
+                                            <span>12/01</span>
+                                            <span>2026</span>
+                                            <span>02/01</span>
+                                            <span>03/01</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bottom-panel">
+                                    <div class="tabs">
+                                        <div class="tab active" id="futuresPositionsTab">Positions(0)</div>
+                                        <div class="tab">Open Orders(0)</div>
+                                        <div class="tab">Order History</div>
+                                        <div class="tab">Trade History</div>
+                                        <div class="tab">Transaction History</div>
+                                        <div class="tab">Position History</div>
+                                        <div class="tab">Bots</div>
+                                        <div class="tab">Assets</div>
+                                    </div>
+                                    <div class="panel-content">
+                                        <div id="futuresPositions" class="futures-positions-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="right-col">
+                                <div class="right-section orderbook-panel">
+                                    <div class="ob-header">
+                                        <span>Order Book</span>
+                                        <div class="ob-icons">
+                                            <span><i class="fas fa-layer-group"></i></span>
+                                            <span><i class="fas fa-gear"></i></span>
+                                        </div>
+                                    </div>
+                                    <table class="ob-table" cellspacing="0" cellpadding="0">
+                                        <thead>
+                                            <tr>
+                                                <th>Price (USDT)</th>
+                                                <th>Size (BTC)</th>
+                                                <th>Sum (BTC)</th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                    <div class="ob-list" id="asks-container"></div>
+                                    <div class="ob-center">
+                                        <span class="price live-price">--</span>
+                                        <span class="ob-center-arrow">&darr;</span>
+                                        <span class="fiat ob-center-mark" id="mark-price">--</span>
+                                    </div>
+                                    <div class="ob-list" id="bids-container"></div>
+                                </div>
+
+                                <div class="right-section orderentry-panel">
+                                    <div class="oe-tabs">
+                                        <div class="oe-btn-group">
+                                            <button class="active">Cross</button>
+                                        </div>
+                                        <div class="oe-btn-group">
+                                            <button class="active">20x</button>
+                                        </div>
+                                        <div class="oe-btn-group">
+                                            <button class="active">S</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="oe-type-tabs">
+                                        <span class="active">Limit</span>
+                                        <span>Market</span>
+                                        <span>Stop Limit</span>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label>Price</label>
+                                        <input type="text" value="" id="input-price">
+                                        <span class="unit">USDT</span>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label>Size</label>
+                                        <input type="text" placeholder="0.00" id="input-size">
+                                        <span class="unit">BTC</span>
+                                    </div>
+
+                                    <div class="slider-container" id="size-slider">
+                                        <div class="slider-track">
+                                            <div class="slider-fill" id="slider-fill"></div>
+                                            <div class="slider-thumb" id="slider-thumb"></div>
+                                        </div>
+                                        <div class="slider-marks">
+                                            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" id="tp-sl-toggle"> TP/SL</label>
+                                    </div>
+                                    <div id="tp-sl-fields" class="tp-sl-fields hidden">
+                                        <div class="input-group">
+                                            <label>TP</label>
+                                            <input type="text" placeholder="Take Profit" id="input-tp">
+                                            <span class="unit">USDT</span>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>SL</label>
+                                            <input type="text" placeholder="Stop Loss" id="input-sl">
+                                            <span class="unit">USDT</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="action-buttons">
+                                        <button class="btn-buy" id="btn-buy">Buy/Long</button>
+                                        <button class="btn-sell" id="btn-sell">Sell/Short</button>
+                                    </div>
+                                </div>
+
+                                <div class="account-panel">
+                                    <div class="acc-header">Account</div>
+                                    <div class="acc-row">
+                                        <span>Margin Ratio</span>
+                                        <span class="val green">0.00%</span>
+                                    </div>
+                                    <div class="acc-row">
+                                        <span>Maintenance Margin</span>
+                                        <span class="val">0.0000 USDT</span>
+                                    </div>
+                                    <div class="acc-row">
+                                        <span>Margin Balance</span>
+                                        <span class="val">0.0000 USDT</span>
+                                    </div>
+                                    <button class="acc-btn-full">Single-Asset Mode</button>
+                                    <div class="acc-buttons">
+                                        <button class="acc-btn">Transfer</button>
+                                        <button class="acc-btn">Buy Crypto</button>
+                                        <button class="acc-btn">Swap</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+
+                        <footer class="footer">
+                            <div class="footer-left">
+                                <div class="connection">
+                                    <div class="dot"></div> Stable connection
+                                </div>
+                                <div class="ticker-tape">
+                                    <span>BTCUSDT <span class="green">+1.52%</span> 71,107.4</span>
+                                </div>
+                            </div>
+                            <div class="footer-right">
+                                <a href="#">Help Center</a>
+                                <a href="#">Announcements</a>
+                                <a href="#">Terms</a>
+                            </div>
+                        </footer>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-history">
+                    <div class="history-view">
+                        <div class="history-header">
+                            <h2>Orders & Transactions</h2>
+                            <div class="history-balance">Wallet Balance: <span data-balance-usdt>1000000.00</span> USDT</div>
+                        </div>
+
+                        <div class="history-tabs">
+                            <button class="history-tab active" data-history-tab="order">Order History</button>
+                            <button class="history-tab" data-history-tab="trade">Trade History</button>
+                            <button class="history-tab" data-history-tab="transaction">Transaction History</button>
+                        </div>
+
+                        <div class="history-container">
+                            <table class="history-table">
+                                <thead>
+                                    <tr id="historyTableHead"></tr>
+                                </thead>
+                                <tbody id="historyTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-earn">
+                    <div class="earn-view">
+                        <div class="earn-hero">
+                            <div>
+                                <h1>Staking & Rewards Hub</h1>
+                                <p>Explore flexible earn, fixed earn, and launchpool pages with hundreds of products.</p>
+                            </div>
+                            <div class="earned-box">
+                                <div>Total Earned</div>
+                                <strong id="totalEarnedText">$0.00</strong>
+                            </div>
+                        </div>
+
+                        <div class="earn-controls">
+                            <div class="earn-tabs">
+                                <button class="earn-tab active" data-earn-tab="flex">Flexible Earn</button>
+                                <button class="earn-tab" data-earn-tab="fixed">Fixed Earn</button>
+                                <button class="earn-tab" data-earn-tab="launchpool">Launchpool</button>
+                            </div>
+                            <div class="earn-sort">
+                                <label for="earnSortSelect">Sort</label>
+                                <select id="earnSortSelect">
+                                    <option value="apy_desc">Highest APY</option>
+                                    <option value="apy_asc">Lowest APY</option>
+                                    <option value="name_asc">Asset A-Z</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="earnProductsGrid" class="earn-grid"></div>
+                        <div class="earn-pagination">
+                            <button id="earnPrevBtn" class="outline-btn">Previous</button>
+                            <span id="earnPageInfo">Page 1 of 1</span>
+                            <button id="earnNextBtn" class="outline-btn">Next</button>
+                        </div>
+
+                        <div class="earn-positions">
+                            <div class="position-head">
+                                <strong>My Earn Positions</strong>
+                                <div class="earn-summary" id="earnSummary"></div>
+                            </div>
+                            <div id="earnPositionsList" class="earn-positions-list"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-security">
+                    <div class="simple-panel">
+                        <h2>Security</h2>
+                        <p>2FA, whitelist, and session controls can be integrated in this section.</p>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-identification">
+                    <div class="identification-view">
+                        <div class="ident-head">
+                            <h1>Identity Verification (KYC)</h1>
+                            <p>Manage your submitted documents and track your verification progress.</p>
+                        </div>
+
+                        <div class="ident-status-grid">
+                            <div class="ident-card">
+                                <span class="ident-badge pending"><i class="fas fa-clock"></i> Verification Pending</span>
+                                <h2>Level 1: Personal Verification</h2>
+                                <p>
+                                    Your documents are currently being reviewed by our compliance team. This usually takes 24-48 hours.
+                                    Once approved, your daily withdrawal limit will increase to 100 BTC.
+                                </p>
+                            </div>
+
+                            <div class="ident-card ident-card-side">
+                                <span class="ident-kicker">Next Milestone</span>
+                                <h3>Level 2: Plus</h3>
+                                <p>Requires Proof of Address</p>
+                                <button class="outline-btn ident-lock-btn" type="button" disabled>Locked</button>
+                            </div>
+                        </div>
+
+                        <div class="ident-card">
+                            <div class="ident-doc-head">
+                                <h3>Submitted Documents</h3>
+                                <button class="gradient-btn ident-upload-btn" type="button" id="openIdentificationUpload">
+                                    <i class="fas fa-plus"></i> Add New Document
+                                </button>
+                            </div>
+
+                            <div class="ident-table-wrap">
+                                <table class="ident-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Document Type</th>
+                                            <th>File Name</th>
+                                            <th>Date Uploaded</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><i class="far fa-address-card"></i> Passport (Front)</td>
+                                            <td>passport_scan_v1.jpg</td>
+                                            <td>Feb 22, 2024</td>
+                                            <td><span class="ident-state approved">Approved</span></td>
+                                            <td><button class="outline-btn ident-row-btn" type="button">View</button></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="far fa-user-circle"></i> Selfie Liveness</td>
+                                            <td>selfie_capture.png</td>
+                                            <td>Feb 23, 2024</td>
+                                            <td><span class="ident-state pending">Under Review</span></td>
+                                            <td><button class="outline-btn ident-row-btn" type="button">View</button></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="far fa-file-alt"></i> Proof of Residence</td>
+                                            <td>utility_bill_jan.pdf</td>
+                                            <td>Feb 15, 2024</td>
+                                            <td><span class="ident-state rejected">Rejected</span></td>
+                                            <td><button class="outline-btn ident-row-btn ident-row-reupload" type="button">Re-upload</button></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ident-modal" id="identificationUploadModal" aria-hidden="true">
+                        <div class="ident-modal-card">
+                            <div class="ident-modal-head">
+                                <h2>Upload Document</h2>
+                                <button type="button" class="ident-modal-close" id="closeIdentificationUpload" aria-label="Close upload modal">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+
+                            <p class="ident-modal-subtitle">Select the type of document you are uploading.</p>
+                            <div class="field">
+                                <select id="identificationDocType">
+                                    <option>Government Issued ID</option>
+                                    <option>Driver's License</option>
+                                    <option>Bank Statement (Residence)</option>
+                                    <option>Utility Bill</option>
+                                </select>
+                            </div>
+
+                            <label class="ident-dropzone" for="identificationFileInput">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span>Drag and drop or <b>browse</b></span>
+                                <small>JPG, PNG or PDF (Max 5MB)</small>
+                            </label>
+                            <input id="identificationFileInput" type="file" hidden>
+
+                            <button class="gradient-btn ident-confirm-btn" type="button" id="confirmIdentificationUpload">Confirm Upload</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-view" id="view-api">
+                    <div class="simple-panel">
+                        <h2>API Keys</h2>
+                        <p>API key generation and scopes can be controlled here.</p>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div class="earn-modal" id="earnSubscribeModal" aria-hidden="true">
+        <div class="earn-modal-card">
+            <div class="earn-modal-head">
+                <h2>Subscribe to Earn</h2>
+                <button type="button" class="earn-modal-close" id="closeEarnModal" aria-label="Close earn modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="earn-modal-body">
+                <div class="earn-modal-meta" id="earnModalMeta">Product</div>
+                <div class="field">
+                    <label for="earnAmountInput">Amount (USDT)</label>
+                    <input id="earnAmountInput" type="number" min="0" step="0.01" placeholder="0.00">
+                    <div class="earn-help" id="earnAmountHelp"></div>
+                </div>
+                <div class="earn-modal-actions">
+                    <button type="button" class="outline-btn" id="cancelEarnModal">Cancel</button>
+                    <button type="button" class="gradient-btn" id="confirmEarnModal">Confirm Subscribe</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="user-dropdown" id="profileMenu">
+        <div class="profile-head">
+            <div class="profile-avatar">{{ request.user.first_name|default:request.user.email|slice:":2"|upper }}</div>
+            <div>
+                <div class="profile-name">{{ request.user.first_name|default:request.user.email }}</div>
+                <div class="profile-id">Verified User</div>
+            </div>
+        </div>
+        <button class="side-link" data-view="security"><i class="fas fa-user-circle"></i> Profile Settings</button>
+        <button class="side-link" data-view="earn"><i class="fas fa-gift"></i> Reward Center</button>
+        <form method="post" action="{% url 'logout' %}" id="logoutForm">
+            {% csrf_token %}
+            <button type="submit" class="side-link logout-link"><i class="fas fa-sign-out-alt"></i> Log Out Session</button>
+        </form>
+    </div>
+
+    <script>
+        window.nexusBootstrap = {
+            initialUSDT: 1000000,
+            coinApiKey: "{{ COINAPI_API_KEY|default:''|escapejs }}",
+            userLabel: "{{ request.user.first_name|default:request.user.email|escapejs }}",
+            userId: "{{ request.user.id|default:''|escapejs }}"
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="{% static 'js/dashboard_overview.js' %}"></script>
+    <script src="{% static 'js/dashboard.js' %}"></script>
+    <script src="{% static 'js/margin_terminal.js' %}"></script>
+    <script src="{% static 'js/futures.js' %}"></script>
+</body>
+</html>
+
+
+

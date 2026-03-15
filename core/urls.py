@@ -1,0 +1,31 @@
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path('favicon.ico', views.favicon, name='favicon'),
+    path('', views.index, name='index'),
+    path('signup/', views.SignupEmailView.as_view(), name='signup'),
+    path('login/', views.SigninView.as_view(), name='login'),
+    path('signin/', views.SigninView.as_view(), name='signin'),
+    path('logout/', views.LogoutView.as_view(), name='logout'),
+    path('signup/password/', views.SignupPasswordView.as_view(), name='signup_password'),
+    path('signup/verify-otp/', views.SignupVerifyOtpView.as_view(), name='signup_verify_otp'),
+    path('signup/resend-otp/', views.SignupResendOtpView.as_view(), name='signup_resend_otp'),
+    path('welcome/', views.WelcomeView.as_view(), name='welcome'),
+    path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+    path('market/', views.MarketView.as_view(), name='market'),
+    path('deposit-methods/', views.DepositMethodsView.as_view(), name='deposit_methods'),
+    path('api/binance/exchange-info/', views.binance_exchange_info, name='binance_exchange_info'),
+    path('api/binance/ticker-24hr/', views.binance_ticker_24hr, name='binance_ticker_24hr'),
+    path('api/binance/ping/', views.binance_ping, name='binance_ping'),
+    path('api/binance/depth/', views.binance_depth, name='binance_depth'),
+    path('api/binance/klines/', views.binance_klines, name='binance_klines'),
+    path('api/candles/', views.candles, name='candles'),
+    path('api/ticker/', views.ticker, name='ticker'),
+    path('api/orderbook/', views.orderbook, name='orderbook'),
+    path('api/order', views.order, name='order'),
+    path('api/coingecko/markets/', views.coingecko_markets, name='coingecko_markets'),
+    path('api/coingecko/simple-price/', views.coingecko_simple_price, name='coingecko_simple_price'),
+    path('api/coingecko/market-chart/', views.coingecko_market_chart, name='coingecko_market_chart'),
+]
