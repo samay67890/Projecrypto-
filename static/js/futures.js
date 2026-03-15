@@ -192,6 +192,11 @@
             el.textContent = formatted;
             el.style.color = isUp ? "var(--color-up)" : "var(--color-down)";
         });
+        fiatEls().forEach((el) => {
+            el.textContent = `$${formatted}`;
+        });
+        updateAccountPanel();
+        updatePositionsTab();
         const axis = axisPriceEl();
         if (axis) {
             axis.textContent = formatted;
@@ -294,7 +299,10 @@
     function placeOrder(side) {
         const price = Number((inputPriceEl() || {}).value || 0);
         const size = Number((inputSizeEl() || {}).value || 0);
-        if (!price || !size) return;
+        if (!price || !size) {
+            alert("Please enter both price and size.");
+            return;
+        }
         const leverage = 20;
         const tp = Number((inputTp() || {}).value || 0);
         const sl = Number((inputSl() || {}).value || 0);
@@ -307,9 +315,40 @@
                 sl,
             });
             window.nexusTradeApi.renderFuturesPositions();
+            updateAccountPanel();
+            updatePositionsTab();
+        } else {
+            alert("Trading system is not ready. Please refresh the page.");
         }
         const sizeInput = inputSizeEl();
         if (sizeInput) sizeInput.value = "";
+    }
+
+    function updateAccountPanel() {
+        const api = window.nexusTradeApi;
+        if (!api) return;
+        const positions = typeof api.getFuturesPositions === "function" ? api.getFuturesPositions() : [];
+        const locked = positions.reduce((s, p) => s + Number(p.margin || 0), 0);
+        const usdtBalance = typeof api.getWalletBalance === "function" ? api.getWalletBalance("USDT") : 0;
+        const marginBalance = usdtBalance + locked;
+        const maintenance = locked * 0.005;
+        const ratio = typeof api.getMarginRatio === "function" ? api.getMarginRatio() : 0;
+
+        const rows = document.querySelectorAll(".futures-shell .acc-row .val");
+        if (rows.length >= 3) {
+            rows[0].textContent = ratio.toFixed(2) + "%";
+            rows[0].className = "val " + (ratio < 50 ? "green" : "red");
+            rows[1].textContent = formatMoney(maintenance) + " USDT";
+            rows[2].textContent = formatMoney(marginBalance) + " USDT";
+        }
+    }
+
+    function updatePositionsTab() {
+        const api = window.nexusTradeApi;
+        if (!api) return;
+        const count = typeof api.getFuturesCount === "function" ? api.getFuturesCount() : 0;
+        const tab = document.getElementById("futuresPositionsTab");
+        if (tab) tab.textContent = `Positions(${count})`;
     }
 
     function initSlider() {

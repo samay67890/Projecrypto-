@@ -2094,6 +2094,15 @@
         getSelectedCoin: () => ({ ...selectedCoin }),
         renderFuturesPositions,
         getFuturesCount: () => state.futuresPositions.length,
+        getWalletBalance: (symbol) => getWalletBalance(symbol),
+        getFuturesPositions: () => [...state.futuresPositions],
+        getMarginRatio: () => {
+            const locked = state.futuresPositions.reduce((s, p) => s + Number(p.margin || 0), 0);
+            const balance = getWalletBalance("USDT") + locked;
+            if (balance <= 0) return 0;
+            const maintenance = locked * 0.005;
+            return (maintenance / balance) * 100;
+        },
     };
 })();
 
