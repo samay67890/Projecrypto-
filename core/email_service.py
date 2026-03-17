@@ -71,22 +71,6 @@ def send_otp_email(email, otp_code):
             logger.warning("Email password is placeholder; skipping send.")
             return False
         
-        # Check if password looks like a regular password (not App Password)
-        # Gmail App Passwords are 16 characters with no spaces
-        pwd = settings.EMAIL_HOST_PASSWORD or ''
-        if pwd and len(pwd) < 16 and ' ' not in pwd:
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H4",
-                location="core/email_service.py:send_otp_email:likely_regular_password",
-                message="EMAIL_HOST_PASSWORD appears to be regular password (not App Password)",
-                data={"pwd_len": len(pwd)},
-            )
-            # endregion agent log
-            logger.warning("Email password may be regular password instead of App Password. Gmail requires App Passwords for SMTP.")
-            # Still try to send - might work if 2FA is disabled, but likely will fail
-        
         # Render HTML email template
         html_content = render_to_string(
             'emails/otp/verification.html',
