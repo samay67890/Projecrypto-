@@ -44,11 +44,13 @@
         loadCandles();
         loadTicker();
         loadOrderBook();
+        loadRecentTrades();
         if (window.nexusTradeApi && typeof window.nexusTradeApi.renderFuturesPositions === "function") {
             window.nexusTradeApi.renderFuturesPositions();
         }
         tickerTimer = setInterval(loadTicker, 1500);
         setInterval(loadOrderBook, 2000);
+        connectLiveTradeStream();
         window.addEventListener("resize", resizeChart);
         document.addEventListener("nexus:view:change", (event) => {
             if (event?.detail?.view === "futures") {
@@ -272,6 +274,58 @@
         }
         renderOrderRows(asksContainer(), asks, "ask");
         renderOrderRows(bidsContainer(), bids, "bid");
+    }
+
+    async function loadRecentTrades() {
+        try {
+            const data = await fetchJson(`https://api.binance.com/api/v3/aggTrades?symbol=${SYMBOL}&limit=20`);
+            if (!Array.isArray(data)) return;
+            const container = document.getElementById("futuresTrades");
+            if (!container) return;
+            container.innerHTML = "";
+            data.reverse().forEach((t) => {
+                const price = Number(t.p);
+                const qty = Number(t.q);
+                const time = new Date(t.T);
+                const isBuy = !t.m;
+                renderTradeRow(container, time, price, qty, isBuy);
+            });
+        } catch (error) {
+            console.error("Failed to load recent trades", error);
+        }
+    }
+
+    let liveTradeSocket = null;
+    function connectLiveTradeStream() {
+        try {
+            liveTradeSocket = new WebSocket(`wss://stream.binance.com:9443/ws/${SYMBOL.toLowerCase()}@aggTrade`);
+            liveTradeSocket.onmessage = (event) => {
+                const t = JSON.parse(event.data || "{}");
+                const price = Number(t.p);
+                const qty = Number(t.q);
+                if (!Number.isFinite(price)) return;
+                const time = new Date(t.T);
+                const isBuy = !t.m;
+                const container = document.getElementById("futuresTrades");
+                if (!container) return;
+                renderTradeRow(container, time, price, qty, isBuy);
+                while (container.children.length > 25) container.removeChild(container.lastChild);
+            };
+            liveTradeSocket.onclose = () => { liveTradeSocket = null; };
+            liveTradeSocket.onerror = () => { liveTradeSocket = null; };
+        } catch (error) {
+            liveTradeSocket = null;
+        }
+    }
+
+    function renderTradeRow(container, time, price, qty, isBuy) {
+        const row = document.createElement("div");
+        row.className = `future-trade-row ${isBuy ? "buy" : "sell"}`;
+        const h = String(time.getHours()).padStart(2, "0");
+        const m = String(time.getMinutes()).padStart(2, "0");
+        const s = String(time.getSeconds()).padStart(2, "0");
+        row.innerHTML = `<span>${h}:${m}:${s}</span><span>${formatMoney(price)}</span><span>${qty.toFixed(5)}</span>`;
+        container.prepend(row);
     }
 
     function initActions() {

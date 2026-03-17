@@ -322,6 +322,60 @@
     flex-direction: column;
 }
 
+.futures-shell .trades-panel {
+    max-height: 220px;
+    min-height: 120px;
+}
+
+.futures-shell .trades-head {
+    display: flex;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.futures-shell .trades-head span {
+    flex: 1;
+    text-align: right;
+}
+
+.futures-shell .trades-head span:first-child {
+    text-align: left;
+}
+
+.futures-shell .trades-scroll {
+    flex: 1;
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.futures-shell .future-trade-row {
+    display: flex;
+    padding: 1px 12px;
+    line-height: 1.7;
+}
+
+.futures-shell .future-trade-row span {
+    flex: 1;
+    text-align: right;
+}
+
+.futures-shell .future-trade-row span:first-child {
+    text-align: left;
+    color: var(--text-secondary);
+}
+
+.futures-shell .future-trade-row.buy span:nth-child(2) {
+    color: var(--color-up);
+}
+
+.futures-shell .future-trade-row.sell span:nth-child(2) {
+    color: var(--color-down);
+}
+
 .futures-shell .orderbook-panel {
     flex: 1;
     min-height: 350px;
