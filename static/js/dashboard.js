@@ -716,10 +716,20 @@
         const amount = Number((qs("marginAmountInput") || {}).value || 0);
         const entry = Number((qs("marginPriceInput") || {}).value || lastPrice);
         const leverage = Number((qs("marginRange") || {}).value || 20);
-        if (!amount || amount <= 0 || !entry) return;
+        if (!amount || amount <= 0) {
+            alert("Please enter a valid amount.");
+            return;
+        }
+        if (!entry) {
+            alert("Price is not available yet. Please wait.");
+            return;
+        }
         const marginRequired = (amount * entry) / leverage;
         const usdtBalance = getWalletBalance("USDT");
-        if (marginRequired > usdtBalance) return alert("Not enough USDT margin.");
+        if (marginRequired > usdtBalance) {
+            alert(`Not enough USDT. Required margin: $${fmtMoney(marginRequired)}, Available: $${fmtMoney(usdtBalance)}`);
+            return;
+        }
         createMarginOrder(side, amount, entry, leverage);
     }
 
@@ -780,6 +790,14 @@
             amount: `${fmtMoney(order.margin)} (Margin Locked)`,
             status: "Completed",
             details: "Spot to Margin",
+        });
+        pushHistory("trades", {
+            time: order.time,
+            pair: `${selectedCoin.symbol}/USDT`,
+            side: order.side === "long" ? "Buy" : "Sell",
+            price: fmtMoney(order.entry),
+            executed: fmtAsset(order.amount),
+            fee: fmtMoney(order.entry * order.amount * 0.001),
         });
         saveState();
         renderMarginOrders();
