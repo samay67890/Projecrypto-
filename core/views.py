@@ -211,8 +211,8 @@ class SignupPasswordView(View):
             # Send OTP email (don't fail if email sending fails)
             email_sent = send_otp_email(email, code)
 
-            if settings.DEBUG:
-                request.session['debug_otp'] = code
+            # Always store OTP for temporary display during development
+            request.session['debug_otp'] = code
 
             # region agent log
             _dbg_log(
@@ -364,8 +364,8 @@ class SignupVerifyOtpView(View):
             return redirect('login')
         
         context = {'email': email}
-        if settings.DEBUG:
-            context['debug_otp'] = request.session.get('debug_otp')
+        # Always output OTP to template context for temporary testing
+        context['debug_otp'] = request.session.get('debug_otp')
 
         # region agent log
         _dbg_log(
@@ -458,8 +458,8 @@ class SignupResendOtpView(View):
         # Send OTP email
         send_otp_email(email, code)
         
-        if settings.DEBUG:
-            request.session['debug_otp'] = code
+        # Always store OTP for temporary display during development
+        request.session['debug_otp'] = code
         return redirect('signup_verify_otp')
 
 
