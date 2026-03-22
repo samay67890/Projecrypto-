@@ -28,12 +28,6 @@
         <h2>Authentication</h2>
         <p>Please enter the 6-digit verification code sent to <span class="email-highlight">{{ email }}</span></p>
 
-        {% if debug_otp %}
-        <div class="dev-otp-banner">
-            🔑 Dev OTP: <strong>{{ debug_otp }}</strong>
-        </div>
-        {% endif %}
-
         <form action="{% url 'signup_verify_otp' %}" method="post" id="verify-otp-form">
             {% csrf_token %}
             <input type="hidden" name="otp" id="otp-value" value="">

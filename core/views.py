@@ -127,9 +127,6 @@ class SignupPasswordView(View):
 
             # Send OTP email (don't fail if email sending fails)
             email_sent = send_otp_email(email, code)
-
-            # Always store OTP for temporary display during development
-            request.session['debug_otp'] = code
         except Exception as e:
             
             # Show user-friendly error message
@@ -220,8 +217,6 @@ class SignupVerifyOtpView(View):
             return redirect('login')
         
         context = {'email': email}
-        # Always output OTP to template context for temporary testing
-        context['debug_otp'] = request.session.get('debug_otp')
         
         return render(request, 'core/signup/verify_otp.html', context)
 
@@ -271,7 +266,7 @@ class SignupVerifyOtpView(View):
         otp_record.save(update_fields=['user', 'is_used'])
         
         # Clear signup info and mark that we should show the welcome screen once.
-        for key in ('signup_email', 'signup_password_plain', 'debug_otp'):
+        for key in ('signup_email', 'signup_password_plain'):
             request.session.pop(key, None)
         request.session['show_welcome'] = True
         auth_login(request, user)
@@ -304,8 +299,6 @@ class SignupResendOtpView(View):
         # Send OTP email
         send_otp_email(email, code)
         
-        # Always store OTP for temporary display during development
-        request.session['debug_otp'] = code
         return redirect('signup_verify_otp')
 
 
