@@ -1,176 +1,282 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* ===== OTP Verification Page ===== */
 
-:root {
-    --bg-color: #0b0e11;
-    --input-bg: #1e2329;
-    --text-main: #ffffff;
-    --text-dim: #848e9c;
-    --accent-gradient: linear-gradient(90deg, #9b51e0, #e91e63);
-}
-
-body,
-html {
+/* --- Base & Reset --- */
+* {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Inter', sans-serif;
-    background-color: var(--bg-color);
-    color: white;
-    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.container {
+body {
+    background-color: #0b0e11;
     display: flex;
-    height: 100vh;
-}
-
-.left-side {
-    flex: 1;
-    background-color: #050505;
-    background-image: radial-gradient(#333 1px, transparent 1px);
-    background-size: 30px 30px;
-    display: flex;
-    flex-direction: column;
-    padding: 60px;
     justify-content: center;
-}
-
-.brand-heading {
-    font-weight: bold;
-    font-size: 20px;
-    margin-bottom: 60px;
-}
-
-.hero-title {
-    font-size: 48px;
-    font-weight: bold;
-}
-
-.gradient-text {
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.hero-subtitle {
-    margin-top: 40px;
-    color: var(--text-dim);
-}
-
-.right-side {
-    flex: 1;
-    display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 40px;
+    min-height: 100vh;
+    color: #eaecef;
+    padding: 20px;
 }
 
-.form-container {
+/* --- Background animated grid --- */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        radial-gradient(circle at 20% 50%, rgba(252, 213, 53, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(252, 213, 53, 0.02) 0%, transparent 50%),
+        linear-gradient(rgba(43, 49, 57, 0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(43, 49, 57, 0.3) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* --- OTP Card Container --- */
+.otp-card {
+    background-color: #181a20;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(43, 49, 57, 0.8),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
     width: 100%;
     max-width: 420px;
     text-align: center;
+    animation: cardAppear 0.5s ease-out;
 }
 
-.form-container h2 {
-    font-size: 28px;
-    margin-bottom: 12px;
+@keyframes cardAppear {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
-.subtitle {
-    color: var(--text-dim);
-    font-size: 14px;
-    margin-bottom: 40px;
-    line-height: 1.5;
-}
-
-.subtitle b {
-    color: white;
-}
-
-.otp-wrapper {
+/* --- Logo Section --- */
+.logo-section {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: center;
     gap: 10px;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
 }
 
-.otp-input {
-    width: 50px;
-    height: 60px;
-    background: var(--input-bg);
-    border: 1px solid #474d57;
+.logo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: rgba(252, 213, 53, 0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(252, 213, 53, 0.2);
+}
+
+.logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    color: #eaecef;
+    letter-spacing: 0.5px;
+}
+
+/* --- Typography --- */
+.otp-card h2 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #eaecef;
+    font-weight: 600;
+}
+
+.otp-card p {
+    font-size: 14px;
+    color: #848e9c;
+    margin-bottom: 28px;
+    line-height: 1.6;
+}
+
+.email-highlight {
+    color: #fcd535;
+    font-weight: 600;
+}
+
+/* --- Dev OTP Banner --- */
+.dev-otp-banner {
+    background: rgba(252, 213, 53, 0.08);
+    border: 1px solid rgba(252, 213, 53, 0.2);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: #fcd535;
+    animation: bannerPulse 2s ease-in-out infinite;
+}
+
+@keyframes bannerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* --- Error Message --- */
+.form-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(246, 70, 93, 0.08);
+    border: 1px solid rgba(246, 70, 93, 0.3);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #f6465d;
+}
+
+/* --- OTP Input Fields --- */
+.otp-input-group {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.otp-input-group input {
+    width: 48px;
+    height: 56px;
+    background-color: #0b0e11;
+    border: 1.5px solid #2b3139;
     border-radius: 8px;
     text-align: center;
     font-size: 24px;
-    font-weight: bold;
-    color: white;
-}
-
-.otp-input:focus {
-    border-color: #9b51e0;
+    font-weight: 600;
+    color: #eaecef;
+    transition: all 0.2s ease-in-out;
     outline: none;
-    background: #2b3139;
+    caret-color: #fcd535;
 }
 
-.btn-primary {
+/* Hide number spin buttons */
+.otp-input-group input::-webkit-outer-spin-button,
+.otp-input-group input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.otp-input-group input[type=number] {
+    -moz-appearance: textfield;
+}
+
+.otp-input-group input:focus {
+    border-color: #fcd535;
+    box-shadow: 0 0 0 3px rgba(252, 213, 53, 0.1);
+    background-color: #1e2329;
+}
+
+.otp-input-group input.filled {
+    border-color: #fcd535;
+    background-color: rgba(252, 213, 53, 0.03);
+}
+
+.otp-input-group input.error {
+    border-color: #f6465d;
+    box-shadow: 0 0 0 3px rgba(246, 70, 93, 0.1);
+    animation: inputShake 0.4s ease;
+}
+
+@keyframes inputShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+}
+
+/* --- Verify Button --- */
+.verify-btn {
     width: 100%;
     padding: 14px;
+    background-color: #fcd535;
+    color: #181a20;
     border: none;
     border-radius: 8px;
-    background: var(--accent-gradient);
-    color: white;
-    font-weight: bold;
     font-size: 16px;
+    font-weight: 600;
     cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
 }
 
-.btn-primary:hover {
-    opacity: 0.95;
+.verify-btn:hover {
+    background-color: #e6c02a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(252, 213, 53, 0.2);
 }
 
+.verify-btn:active {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+.verify-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* --- Resend Section --- */
 .resend-text {
-    margin-top: 25px;
     font-size: 14px;
-    color: var(--text-dim);
+    color: #848e9c;
 }
 
-.resend-text a {
-    color: #9b51e0;
+.resend-link {
+    color: #fcd535;
     text-decoration: none;
-    font-weight: bold;
+    font-weight: 500;
+    transition: all 0.2s;
 }
 
-.resend-text a:hover {
+.resend-link:hover {
     text-decoration: underline;
+    color: #ffe066;
 }
 
-.form-container .form-error {
-    color: #f87171;
-    font-size: 14px;
-    margin-bottom: 16px;
-    text-align: left;
+.resend-link.disabled {
+    color: #474d57;
+    pointer-events: none;
+    cursor: not-allowed;
+    text-decoration: none;
 }
 
-@media (max-width: 900px) {
-    .left-side {
-        display: none;
+/* --- Responsive --- */
+@media (max-width: 480px) {
+    .otp-card {
+        padding: 28px 20px;
+        border-radius: 12px;
     }
 
-    .container {
-        height: auto;
-        min-height: 100vh;
-    }
-
-    .right-side {
-        padding: 40px 20px;
-    }
-
-    .otp-wrapper {
+    .otp-input-group {
         gap: 8px;
     }
 
-    .otp-input {
-        width: 44px;
-        height: 56px;
+    .otp-input-group input {
+        width: 42px;
+        height: 50px;
+        font-size: 20px;
+    }
+
+    .otp-card h2 {
+        font-size: 20px;
     }
 }

@@ -1,51 +1,132 @@
-(function () {
-    var form = document.getElementById('verify-otp-form');
-    var inputs = document.querySelectorAll('.otp-input');
-    var hiddenOtp = document.getElementById('otp-value');
+/**
+ * OTP Verification Page — Input handling, paste support, resend timer.
+ * Integrates with Django form by populating a hidden #otp-value field.
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    const inputs = document.querySelectorAll('.otp-input-group input');
+    const form = document.getElementById('verify-otp-form');
+    const hiddenOtp = document.getElementById('otp-value');
+    const verifyBtn = document.getElementById('verify-btn');
+    const resendBtn = document.getElementById('resend-btn');
 
-    if (!inputs.length) return;
-
-    function getOtpString() {
-        return Array.prototype.map.call(inputs, function (inp) { return inp.value || ''; }).join('');
+    // ── Sync hidden field ──
+    function syncOtp() {
+        const code = Array.from(inputs).map(i => i.value).join('');
+        if (hiddenOtp) hiddenOtp.value = code;
+        return code;
     }
 
-    function setHiddenOtp(value) {
-        if (hiddenOtp) hiddenOtp.value = value;
-    }
+    // ── Input handler ──
+    inputs.forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+            const value = e.target.value;
 
-    // Auto-focus and single-digit input
-    inputs.forEach(function (input, index) {
-        input.addEventListener('keyup', function (e) {
-            if (e.key >= '0' && e.key <= '9') {
-                input.value = e.key;
-                setHiddenOtp(getOtpString());
-                if (index < inputs.length - 1) inputs[index + 1].focus();
-            } else if (e.key === 'Backspace') {
-                input.value = '';
-                setHiddenOtp(getOtpString());
-                if (index > 0) inputs[index - 1].focus();
+            // Only allow digits
+            if (!/^[0-9]$/.test(value)) {
+                e.target.value = '';
+                e.target.classList.remove('filled');
+                syncOtp();
+                return;
+            }
+
+            e.target.classList.add('filled');
+            e.target.classList.remove('error');
+
+            // Move to next input
+            if (value !== '' && index < inputs.length - 1) {
+                inputs[index + 1].focus();
+            }
+
+            syncOtp();
+        });
+
+        // ── Backspace navigation ──
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace') {
+                e.target.classList.remove('filled');
+                if (e.target.value === '' && index > 0) {
+                    inputs[index - 1].focus();
+                    inputs[index - 1].value = '';
+                    inputs[index - 1].classList.remove('filled');
+                }
+                // Sync after a tiny delay so the value is cleared
+                setTimeout(syncOtp, 10);
             }
         });
 
-        input.addEventListener('paste', function (e) {
+        // ── Paste support ──
+        input.addEventListener('paste', (e) => {
             e.preventDefault();
-            var pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
-            for (var i = 0; i < pasted.length && i < inputs.length; i++) {
-                inputs[i].value = pasted[i];
+            const pasted = e.clipboardData.getData('text').replace(/\D/g, '').substring(0, inputs.length);
+
+            if (pasted) {
+                [...pasted].forEach((char, i) => {
+                    if (inputs[i]) {
+                        inputs[i].value = char;
+                        inputs[i].classList.add('filled');
+                        inputs[i].classList.remove('error');
+                    }
+                });
+
+                const nextIdx = Math.min(pasted.length, inputs.length - 1);
+                inputs[nextIdx].focus();
+                syncOtp();
             }
-            setHiddenOtp(getOtpString());
-            if (pasted.length > 0 && pasted.length < inputs.length) {
-                inputs[pasted.length].focus();
-            } else if (pasted.length >= inputs.length) {
-                inputs[inputs.length - 1].focus();
-            }
+        });
+
+        // ── Click to select content ──
+        input.addEventListener('click', () => {
+            input.select();
         });
     });
 
-    // On submit: ensure combined OTP is in hidden input
+    // ── Form submit — validate before sending ──
     if (form) {
-        form.addEventListener('submit', function () {
-            setHiddenOtp(getOtpString());
+        form.addEventListener('submit', (e) => {
+            const code = syncOtp();
+
+            if (code.length !== inputs.length) {
+                e.preventDefault();
+
+                // Flash empty inputs red
+                inputs.forEach(input => {
+                    if (!input.value) {
+                        input.classList.add('error');
+                        setTimeout(() => input.classList.remove('error'), 1200);
+                    }
+                });
+                return;
+            }
+
+            // Disable button to prevent double submit
+            if (verifyBtn) {
+                verifyBtn.disabled = true;
+                verifyBtn.textContent = 'Verifying...';
+            }
         });
     }
-})();
+
+    // ── Resend countdown timer ──
+    if (resendBtn) {
+        let timeLeft = 59;
+        const originalHref = resendBtn.getAttribute('href');
+        const originalText = resendBtn.textContent;
+
+        // Disable during countdown
+        resendBtn.classList.add('disabled');
+        resendBtn.removeAttribute('href');
+        resendBtn.textContent = `Resend (${timeLeft}s)`;
+
+        const timer = setInterval(() => {
+            timeLeft -= 1;
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                resendBtn.textContent = originalText;
+                resendBtn.classList.remove('disabled');
+                resendBtn.setAttribute('href', originalHref);
+            } else {
+                resendBtn.textContent = `Resend (${timeLeft}s)`;
+            }
+        }, 1000);
+    }
+});

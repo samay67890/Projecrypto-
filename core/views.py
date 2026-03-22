@@ -1,4 +1,5 @@
 import random
+import logging
 from datetime import timedelta
 
 from django.contrib.auth import authenticate, get_user_model, login as auth_login, logout as auth_logout
@@ -15,85 +16,24 @@ from accounts.models import OTP
 from core.email_service import send_otp_email
 
 User = get_user_model()
-
-# region agent log
-import json as _json
-import time as _time
-
-_DEBUG_LOG_PATH = r"d:\Downloads\NexusCrypto-main\.cursor\debug.log"
-
-
-def _dbg_log(*, runId: str, hypothesisId: str, location: str, message: str, data: dict | None = None):
-    try:
-        payload = {
-            "id": f"log_{_time.time_ns()}",
-            "timestamp": int(_time.time() * 1000),
-            "runId": runId,
-            "hypothesisId": hypothesisId,
-            "location": location,
-            "message": message,
-            "data": data or {},
-        }
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(_json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        # Never break request flow due to logging
-        pass
-
-# endregion agent log
+logger = logging.getLogger(__name__)
 
 
 def _create_otp_for_email(email):
     """Generate a 6-digit OTP for email, store hashed version, return plain code for sending."""
-    try:
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H2",
-            location="core/views.py:_create_otp_for_email:start",
-            message="Creating OTP for email",
-            data={
-                "email_present": bool(email),
-                "email_len": len(email) if isinstance(email, str) else None,
-                "email_has_at": ("@" in email) if isinstance(email, str) else None,
-            },
-        )
-        # endregion agent log
-
-        code = ''.join(str(random.randint(0, 9)) for _ in range(6))
-        otp_hash = make_password(code)
-        expires_at = timezone.now() + timedelta(minutes=10)  # 10 minutes expiry
-        
-        # Create OTP record
-        otp = OTP.objects.create(
-            email=email,
-            otp_hash=otp_hash,
-            expires_at=expires_at,
-            user=None  # Explicitly set to None since user doesn't exist yet
-        )
-
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H2",
-            location="core/views.py:_create_otp_for_email:created",
-            message="OTP DB row created",
-            data={"otp_id": otp.id},
-        )
-        # endregion agent log
-        
-        return code
-    except Exception as e:
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H2",
-            location="core/views.py:_create_otp_for_email:exception",
-            message="Exception creating OTP",
-            data={"err_type": e.__class__.__name__},
-        )
-        # endregion agent log
-        raise  # Re-raise to be caught by calling function
+    code = ''.join(str(random.randint(0, 9)) for _ in range(6))
+    otp_hash = make_password(code)
+    expires_at = timezone.now() + timedelta(minutes=10)  # 10 minutes expiry
+    
+    # Create OTP record
+    OTP.objects.create(
+        email=email,
+        otp_hash=otp_hash,
+        expires_at=expires_at,
+        user=None  # Explicitly set to None since user doesn't exist yet
+    )
+    
+    return code
 
 
 def index(request):
@@ -143,15 +83,6 @@ class SignupPasswordView(View):
     def post(self, request):
         email = request.session.get('signup_email')
         if not email:
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H1",
-                location="core/views.py:SignupPasswordView.post:no_email",
-                message="No signup_email in session; redirecting to login",
-                data={"session_keys": list(request.session.keys())[:20], "session_key_count": len(request.session.keys())},
-            )
-            # endregion agent log
             return redirect('signup')
 
         # Validate email format
@@ -189,20 +120,6 @@ class SignupPasswordView(View):
         # We need plain password to create user after OTP verification
         request.session['signup_email'] = email  # Ensure email is still in session
         request.session['signup_password_plain'] = password1
-
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H1",
-            location="core/views.py:SignupPasswordView.post:session_set",
-            message="Stored signup_email and signup_password_plain in session",
-            data={
-                "email_len": len(email) if isinstance(email, str) else None,
-                "password_len": len(password1) if isinstance(password1, str) else None,
-                "session_key_count": len(request.session.keys()),
-            },
-        )
-        # endregion agent log
         
         # Generate OTP for email and send email
         try:
@@ -213,26 +130,7 @@ class SignupPasswordView(View):
 
             # Always store OTP for temporary display during development
             request.session['debug_otp'] = code
-
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H4",
-                location="core/views.py:SignupPasswordView.post:email_sent",
-                message="send_otp_email returned",
-                data={"email_sent": bool(email_sent)},
-            )
-            # endregion agent log
         except Exception as e:
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H3",
-                location="core/views.py:SignupPasswordView.post:exception",
-                message="Exception during OTP create/send",
-                data={"err_type": e.__class__.__name__},
-            )
-            # endregion agent log
             
             # Show user-friendly error message
             err_lower = str(e).lower()
@@ -251,26 +149,8 @@ class SignupPasswordView(View):
         request.session.modified = True
         try:
             request.session.save()
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H1",
-                location="core/views.py:SignupPasswordView.post:session_saved",
-                message="request.session.save() succeeded",
-                data={"session_key_count": len(request.session.keys())},
-            )
-            # endregion agent log
-        except Exception as e:
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H1",
-                location="core/views.py:SignupPasswordView.post:session_save_exception",
-                message="request.session.save() raised",
-                data={"err_type": e.__class__.__name__},
-            )
-            # endregion agent log
-            # Let redirect still happen; OTP page will show what session exists
+        except Exception:
+            pass  # Let redirect still happen; OTP page will show what session exists
         
         return redirect('signup_verify_otp')
 
@@ -330,32 +210,8 @@ class SignupVerifyOtpView(View):
     def get(self, request):
         email = request.session.get('signup_email')
         plain_password = request.session.get('signup_password_plain')
-
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H1",
-            location="core/views.py:SignupVerifyOtpView.get:entry",
-            message="OTP page GET",
-            data={
-                "has_email": bool(email),
-                "has_password": bool(plain_password),
-                "session_key_count": len(request.session.keys()),
-                "session_keys": list(request.session.keys())[:20],
-            },
-        )
-        # endregion agent log
         
         if not email or not plain_password:
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H1",
-                location="core/views.py:SignupVerifyOtpView.get:redirect_login",
-                message="Missing session data; redirecting to login",
-                data={"has_email": bool(email), "has_password": bool(plain_password)},
-            )
-            # endregion agent log
             return redirect('signup')
         
         # Check if user already exists (shouldn't happen, but safety check)
@@ -366,16 +222,6 @@ class SignupVerifyOtpView(View):
         context = {'email': email}
         # Always output OTP to template context for temporary testing
         context['debug_otp'] = request.session.get('debug_otp')
-
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H3",
-            location="core/views.py:SignupVerifyOtpView.get:render",
-            message="Rendering OTP template",
-            data={"debug_otp_present": bool(request.session.get("debug_otp"))},
-        )
-        # endregion agent log
         
         return render(request, 'core/signup/verify_otp.html', context)
 

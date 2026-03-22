@@ -6,48 +6,65 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexusCrypto - Verify OTP</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'css/verify_otp.css' %}" type="text/css" media="all">
 </head>
 <body>
 
-<div class="container">
-    <div class="left-side">
-        <div class="brand-heading"><i class="fas fa-bolt"></i> NexusCrypto</div>
-        <div class="hero-title">Verify your<br><span class="gradient-text">Identity</span></div>
-        <div class="hero-subtitle">One step away from your $50 reward.</div>
-    </div>
+    <div class="otp-card">
+        <!-- Logo -->
+        <div class="logo-section">
+            <div class="logo-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 64 64" fill="none">
+                    <path d="M32 4L8 18v28l24 14 24-14V18L32 4z" fill="#fcd535" opacity="0.15"/>
+                    <path d="M32 4L8 18v28l24 14 24-14V18L32 4z" stroke="#fcd535" stroke-width="2" fill="none"/>
+                    <path d="M32 16l-12 7v14l12 7 12-7V23L32 16z" fill="#fcd535" opacity="0.3"/>
+                    <path d="M32 16l-12 7v14l12 7 12-7V23L32 16z" stroke="#fcd535" stroke-width="1.5" fill="none"/>
+                    <circle cx="32" cy="32" r="6" fill="#fcd535"/>
+                </svg>
+            </div>
+            <span class="logo-text">NexusCrypto</span>
+        </div>
 
-    <div class="right-side">
-        <div class="form-container">
-            <h2>Enter Verification Code</h2>
-            <p class="subtitle">We've sent a 6-digit code to<br><b>{{ email }}</b></p>
-            {% if debug_otp %}<p class="subtitle" style="margin-top:8px;color:#ffd166;">Dev OTP: <b>{{ debug_otp }}</b></p>{% endif %}
+        <h2>Authentication</h2>
+        <p>Please enter the 6-digit verification code sent to <span class="email-highlight">{{ email }}</span></p>
 
-            <form action="{% url 'signup_verify_otp' %}" method="post" id="verify-otp-form">
-                {% csrf_token %}
-                <input type="hidden" name="otp" id="otp-value" value="">
-                {% if error %}
-                    <div class="form-error">{{ error }}</div>
-                {% endif %}
-                <div class="otp-wrapper" id="otp-inputs">
-                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                </div>
+        {% if debug_otp %}
+        <div class="dev-otp-banner">
+            🔑 Dev OTP: <strong>{{ debug_otp }}</strong>
+        </div>
+        {% endif %}
 
-                <button type="submit" class="btn-primary">Verify & Create Account</button>
-            </form>
+        <form action="{% url 'signup_verify_otp' %}" method="post" id="verify-otp-form">
+            {% csrf_token %}
+            <input type="hidden" name="otp" id="otp-value" value="">
 
-            <p class="resend-text">Didn't receive code? <a href="{% url 'signup_resend_otp' %}">Resend Code</a></p>
+            {% if error %}
+            <div class="form-error">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="7" stroke="#f6465d" stroke-width="1.5"/>
+                    <path d="M8 4.5v4M8 10.5v.5" stroke="#f6465d" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <div class="otp-input-group" id="otp-container">
+                <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" autofocus>
+                <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
+                <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
+                <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
+                <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
+                <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
+            </div>
+
+            <button type="submit" class="verify-btn" id="verify-btn">Verify Now</button>
+        </form>
+
+        <div class="resend-text">
+            Didn't receive the code? <a href="{% url 'signup_resend_otp' %}" class="resend-link" id="resend-btn">Resend Code</a>
         </div>
     </div>
-</div>
 
-<script src="{% static 'js/verify_otp.js' %}"></script>
+    <script src="{% static 'js/verify_otp.js' %}"></script>
 </body>
 </html>
-

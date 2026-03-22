@@ -1,75 +1,72 @@
-# Email Setup Guide for NexusCrypto
+# Email Setup Guide for NexusCrypto (Brevo SMTP)
 
 ## Problem: OTP emails are not being sent
 
-If you're seeing errors like "Username and Password not accepted" or emails aren't being sent, follow these steps:
+If OTP emails aren't arriving, follow these steps to configure Brevo SMTP.
 
-## Quick Fix: Set Up Gmail App Password
+## Setup: Brevo SMTP Configuration
 
-### Step 1: Enable 2-Step Verification
-1. Go to [Google Account Security](https://myaccount.google.com/security)
-2. Under "Signing in to Google", click **2-Step Verification**
-3. Follow the prompts to enable it (if not already enabled)
+### Step 1: Create a Brevo Account
+1. Sign up at [Brevo](https://www.brevo.com/) (free tier supports 300 emails/day)
+2. Complete your account setup
 
-### Step 2: Generate App Password
-1. Go to [App Passwords](https://myaccount.google.com/apppasswords)
-2. Select **Mail** from the "Select app" dropdown
-3. Select **Other (Custom name)** from "Select device"
-4. Type: `NexusCrypto`
-5. Click **Generate**
-6. **Copy the 16-character password** (it looks like: `abcd efgh ijkl mnop`)
+### Step 2: Get SMTP Credentials
+1. Go to **Settings → SMTP & API → SMTP** tab
+2. Note the **Login** value (e.g. `a53e3f001@smtp-brevo.com`) — this is your `EMAIL_HOST_USER`
+3. Click **"Generate a new SMTP key"**
+4. Copy the generated key (starts with `xsmtpsib-...`) — this is your `EMAIL_HOST_PASSWORD`
 
-### Step 3: Update .env File
-1. Open `.env` file in the project root
-2. Find the line: `EMAIL_HOST_PASSWORD=your-gmail-app-password-here`
-3. Replace `your-gmail-app-password-here` with your 16-character app password
-4. **Remove all spaces** from the password (it should be 16 characters with no spaces)
-5. Save the file
+### Step 3: Verify a Sender Email
+1. Go to **Settings → Senders, Domains & Dedicated IPs → Senders**
+2. Click **"Add a sender"**
+3. Enter the email address you want to send from (e.g. your Gmail)
+4. **Verify it** by clicking the confirmation link sent to that email
+5. This verified email becomes your `DEFAULT_FROM_EMAIL`
 
-Example:
+### Step 4: Update .env File
+Open `.env` in the project root and set:
+
 ```
-EMAIL_HOST_PASSWORD=abcdefghijklmnop
+EMAIL_HOST=smtp-relay.brevo.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=a53e3f001@smtp-brevo.com
+EMAIL_HOST_PASSWORD=xsmtpsib-your-key-here
+DEFAULT_FROM_EMAIL=your-verified-email@gmail.com
 ```
 
-### Step 4: Restart Server
+> **IMPORTANT**: `EMAIL_HOST_USER` must be the **Brevo SMTP Login** (not your Gmail).
+
+### Step 5: Restart Server
 Restart your Django development server for changes to take effect.
 
 ## Testing Email Setup
 
 After updating `.env`:
-1. Try the signup flow again
-2. Check the server terminal - you should see: `✅ OTP email sent successfully to [email]`
-3. Check your email inbox (and spam folder)
+1. Try the signup flow
+2. Check the server terminal for success/error messages
+3. Check email inbox **and spam folder**
 
 ## Development Mode (Without Email)
 
-If you want to test without setting up email:
-1. In `.env`, change:
-   ```
-   EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-   ```
-2. OTP codes will be printed in the terminal instead of sent via email
-3. The OTP code is also shown on the verification page when `DEBUG=True`
+To test without email, set in `.env`:
+```
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+```
+OTP codes will print in the terminal. In `DEBUG=True` mode, the OTP is also shown on the verification page.
 
 ## Troubleshooting
 
-### Error: "Username and Password not accepted"
-- Make sure you're using an **App Password**, not your regular Gmail password
-- Verify 2-Step Verification is enabled
-- Check that there are no spaces in the password in `.env`
-- Make sure `.env` file is saved
-
-### Error: "Less secure app access"
-- Gmail no longer supports "less secure apps"
-- You **must** use App Passwords (see steps above)
+### Emails not sending
+- Verify `EMAIL_HOST_USER` is the **Brevo SMTP Login** (e.g. `a53e3f001@smtp-brevo.com`), NOT your Gmail
+- Verify `EMAIL_HOST_PASSWORD` is a valid Brevo SMTP key (starts with `xsmtpsib-`)
+- Verify `DEFAULT_FROM_EMAIL` is a **verified sender** in Brevo
 
 ### Emails go to spam
-- This is normal for new email senders
-- Check your spam/junk folder
-- The email is from `poosai270@gmail.com`
+- Check spam/junk folder
+- Add a custom domain in Brevo for better deliverability
 
 ### Still not working?
 - Check server terminal for detailed error messages
 - Verify `.env` file is in the project root (same folder as `manage.py`)
 - Make sure server was restarted after changing `.env`
-- In DEBUG mode, OTP code is always shown on the verification page

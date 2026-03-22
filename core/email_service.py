@@ -1,39 +1,15 @@
-"""Email service for sending OTP verification emails."""
+"""Email service for sending OTP verification emails via Brevo SMTP."""
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 import logging
-import json as _json
-import time as _time
 
 logger = logging.getLogger(__name__)
-
-# region agent log
-_DEBUG_LOG_PATH = r"d:\Downloads\NexusCrypto-main\.cursor\debug.log"
-
-
-def _dbg_log(*, runId: str, hypothesisId: str, location: str, message: str, data: dict | None = None):
-    try:
-        payload = {
-            "id": f"log_{_time.time_ns()}",
-            "timestamp": int(_time.time() * 1000),
-            "runId": runId,
-            "hypothesisId": hypothesisId,
-            "location": location,
-            "message": message,
-            "data": data or {},
-        }
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(_json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-# endregion agent log
 
 
 def send_otp_email(email, otp_code):
     """
-    Send OTP verification email to the user.
+    Send OTP verification email to the user via Brevo SMTP.
     
     Args:
         email: Recipient email address
@@ -45,30 +21,10 @@ def send_otp_email(email, otp_code):
     try:
         # Check if email backend is configured
         if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H4",
-                location="core/email_service.py:send_otp_email:not_configured",
-                message="Email credentials missing",
-                data={"backend": getattr(settings, "EMAIL_BACKEND", None)},
+            logger.warning(
+                "Email credentials not configured (EMAIL_HOST_USER or EMAIL_HOST_PASSWORD empty). "
+                "Skipping OTP email send."
             )
-            # endregion agent log
-            logger.warning("Email credentials not configured; skipping send.")
-            return False
-        
-        # Check if using placeholder password
-        if settings.EMAIL_HOST_PASSWORD == 'your-gmail-app-password-here':
-            # region agent log
-            _dbg_log(
-                runId="pre-fix",
-                hypothesisId="H4",
-                location="core/email_service.py:send_otp_email:placeholder_password",
-                message="Placeholder EMAIL_HOST_PASSWORD detected; skipping send",
-                data={},
-            )
-            # endregion agent log
-            logger.warning("Email password is placeholder; skipping send.")
             return False
         
         # Render HTML email template
@@ -84,7 +40,7 @@ def send_otp_email(email, otp_code):
         from_email = settings.DEFAULT_FROM_EMAIL
         to_email = [email]
         
-        # Create email with HTML content
+        # Create email with both plain-text and HTML content
         email_message = EmailMultiAlternatives(
             subject=subject,
             body=f'Your verification code is: {otp_code}\n\nThis code will expire in 10 minutes.',
@@ -98,29 +54,12 @@ def send_otp_email(email, otp_code):
         # Send email
         email_message.send()
         
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H4",
-            location="core/email_service.py:send_otp_email:sent",
-            message="Email send() succeeded",
-            data={},
-        )
-        # endregion agent log
-        logger.info("OTP email sent successfully.")
+        logger.info(f"OTP email sent successfully to {email}")
         return True
         
     except Exception as e:
-        # Log error details
-        # region agent log
-        _dbg_log(
-            runId="pre-fix",
-            hypothesisId="H4",
-            location="core/email_service.py:send_otp_email:exception",
-            message="Email send() raised",
-            data={"err_type": e.__class__.__name__},
+        logger.error(
+            f"Failed to send OTP email to {email}: {e.__class__.__name__}: {e}",
+            exc_info=True,
         )
-        # endregion agent log
-        logger.error("Error sending OTP email.", exc_info=True)
-        
         return False
