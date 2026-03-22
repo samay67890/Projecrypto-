@@ -156,6 +156,10 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@nexuscrypto.com')
 
+# Prevent Django crash if both TLS and SSL are accidentally True in environment variables
+if EMAIL_USE_SSL:
+    EMAIL_USE_TLS = False
+
 # Market data keys
 COINAPI_API_KEY = config('COINAPI_API_KEY', default='')
 BINANCE_API_KEY = config('BINANCE_API_KEY', default='')
