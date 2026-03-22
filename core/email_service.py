@@ -3,20 +3,37 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
+
+def _send_email_task(email, subject, body, from_email, to_email, html_content):
+    """Background task to send the email."""
+    try:
+        email_message = EmailMultiAlternatives(
+            subject=subject,
+            body=body,
+            from_email=from_email,
+            to=to_email,
+        )
+        email_message.attach_alternative(html_content, 'text/html')
+        email_message.send()
+        logger.info(f"OTP email sent successfully to {email}")
+    except Exception as e:
+        logger.error(f"Failed to send OTP email to {email}: {e.__class__.__name__}: {e}", exc_info=True)
 
 
 def send_otp_email(email, otp_code):
     """
-    Send OTP verification email to the user via Brevo SMTP.
+    Queue an OTP verification email to the user via Brevo SMTP.
+    Runs in a background thread to prevent blocking the web worker.
     
     Args:
         email: Recipient email address
         otp_code: The 6-digit OTP code to include in the email
         
     Returns:
-        bool: True if email was sent successfully, False otherwise
+        bool: True if email task was started, False otherwise
     """
     try:
         # Check if email backend is configured
@@ -35,31 +52,25 @@ def send_otp_email(email, otp_code):
             }
         )
         
-        # Create email message
+        # Create email message details
         subject = 'NexusCrypto - Verify Your Email'
         from_email = settings.DEFAULT_FROM_EMAIL
         to_email = [email]
+        body = f'Your verification code is: {otp_code}\n\nThis code will expire in 10 minutes.'
         
-        # Create email with both plain-text and HTML content
-        email_message = EmailMultiAlternatives(
-            subject=subject,
-            body=f'Your verification code is: {otp_code}\n\nThis code will expire in 10 minutes.',
-            from_email=from_email,
-            to=to_email,
+        # Send email in a background thread
+        thread = threading.Thread(
+            target=_send_email_task,
+            args=(email, subject, body, from_email, to_email, html_content)
         )
+        thread.daemon = True
+        thread.start()
         
-        # Attach HTML version
-        email_message.attach_alternative(html_content, 'text/html')
-        
-        # Send email
-        email_message.send()
-        
-        logger.info(f"OTP email sent successfully to {email}")
         return True
         
     except Exception as e:
         logger.error(
-            f"Failed to send OTP email to {email}: {e.__class__.__name__}: {e}",
+            f"Failed to queue OTP email to {email}: {e.__class__.__name__}: {e}",
             exc_info=True,
         )
         return False
