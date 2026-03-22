@@ -1,5 +1,6 @@
 import random
 import logging
+import traceback
 from datetime import timedelta
 
 from django.contrib.auth import authenticate, get_user_model, login as auth_login, logout as auth_logout
@@ -17,6 +18,72 @@ from core.email_service import send_otp_email
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def debug_health(request):
+    """Diagnostic endpoint to check production systems. Visit /debug/health/ on Render."""
+    checks = {}
+    
+    # 1. Check database connection
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        checks['database'] = '✅ Connected'
+    except Exception as e:
+        checks['database'] = f'❌ {e}'
+    
+    # 2. Check OTP table exists
+    try:
+        count = OTP.objects.count()
+        checks['otp_table'] = f'✅ Exists ({count} records)'
+    except Exception as e:
+        checks['otp_table'] = f'❌ {e}'
+    
+    # 3. Check User table
+    try:
+        count = User.objects.count()
+        checks['user_table'] = f'✅ Exists ({count} users)'
+    except Exception as e:
+        checks['user_table'] = f'❌ {e}'
+    
+    # 4. Check email config
+    checks['email_host'] = getattr(settings, 'EMAIL_HOST', 'NOT SET')
+    checks['email_port'] = getattr(settings, 'EMAIL_PORT', 'NOT SET')
+    checks['email_user'] = getattr(settings, 'EMAIL_HOST_USER', 'NOT SET')
+    checks['email_pass_len'] = len(getattr(settings, 'EMAIL_HOST_PASSWORD', ''))
+    checks['email_from'] = getattr(settings, 'DEFAULT_FROM_EMAIL', 'NOT SET')
+    checks['email_backend'] = getattr(settings, 'EMAIL_BACKEND', 'NOT SET')
+    
+    # 5. Check static files
+    checks['static_storage'] = getattr(settings, 'STATICFILES_STORAGE', 'NOT SET')
+    checks['debug'] = getattr(settings, 'DEBUG', 'NOT SET')
+    checks['allowed_hosts'] = getattr(settings, 'ALLOWED_HOSTS', [])
+    checks['csrf_origins'] = getattr(settings, 'CSRF_TRUSTED_ORIGINS', [])
+    
+    # 6. Check template rendering
+    try:
+        from django.template.loader import render_to_string
+        render_to_string('emails/otp/verification.html', {'otp_code': '123456'})
+        checks['email_template'] = '✅ Renders OK'
+    except Exception as e:
+        checks['email_template'] = f'❌ {e}'
+    
+    # 7. Try rendering verify_otp template
+    try:
+        from django.template.loader import render_to_string
+        render_to_string('core/signup/verify_otp.html', {'email': 'test@test.com'})
+        checks['otp_page_template'] = '✅ Renders OK'
+    except Exception as e:
+        checks['otp_page_template'] = f'❌ {e}'
+    
+    # Format output
+    lines = ['=== NexusCrypto Health Check ===\n']
+    for key, val in checks.items():
+        lines.append(f'{key}: {val}')
+    
+    return HttpResponse('\n'.join(lines), content_type='text/plain')
+
 
 
 def _create_otp_for_email(email):
@@ -81,75 +148,79 @@ class SignupPasswordView(View):
         return render(request, 'core/signup/passwordpage.html', {'email': email})
 
     def post(self, request):
-        email = request.session.get('signup_email')
-        if not email:
-            return redirect('signup')
-
-        # Validate email format
-        from django.core.validators import validate_email
-        from django.core.exceptions import ValidationError
         try:
-            validate_email(email)
-        except ValidationError:
-            return render(request, 'core/signup/passwordpage.html', {
-                'email': email,
-                'errors': ['Invalid email address format.'],
-            })
+            email = request.session.get('signup_email')
+            if not email:
+                return redirect('signup')
 
-        password1 = request.POST.get('password1', '')
-        password2 = request.POST.get('password2', '')
-
-        errors = []
-        if not password1:
-            errors.append('Password is required.')
-        elif password1 != password2:
-            errors.append('The two password fields did not match.')
-        else:
+            # Validate email format
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError
             try:
-                validate_password(password1, User(email=email))
+                validate_email(email)
+            except ValidationError:
+                return render(request, 'core/signup/passwordpage.html', {
+                    'email': email,
+                    'errors': ['Invalid email address format.'],
+                })
+
+            password1 = request.POST.get('password1', '')
+            password2 = request.POST.get('password2', '')
+
+            errors = []
+            if not password1:
+                errors.append('Password is required.')
+            elif password1 != password2:
+                errors.append('The two password fields did not match.')
+            else:
+                try:
+                    validate_password(password1, User(email=email))
+                except Exception as e:
+                    errors.extend(list(e.messages))
+
+            if errors:
+                return render(request, 'core/signup/passwordpage.html', {
+                    'email': email,
+                    'errors': errors,
+                })
+
+            # Store password in session temporarily
+            request.session['signup_email'] = email
+            request.session['signup_password_plain'] = password1
+            
+            # Generate OTP for email and send email
+            try:
+                code = _create_otp_for_email(email)
+                email_sent = send_otp_email(email, code)
             except Exception as e:
-                errors.extend(list(e.messages))
-
-        if errors:
-            return render(request, 'core/signup/passwordpage.html', {
-                'email': email,
-                'errors': errors,
-            })
-
-        # Store password in session temporarily (Django sessions are encrypted)
-        # We need plain password to create user after OTP verification
-        request.session['signup_email'] = email  # Ensure email is still in session
-        request.session['signup_password_plain'] = password1
-        
-        # Generate OTP for email and send email
-        try:
-            code = _create_otp_for_email(email)
-
-            # Send OTP email (don't fail if email sending fails)
-            email_sent = send_otp_email(email, code)
+                logger.error(f"OTP create/send failed: {traceback.format_exc()}")
+                err_lower = str(e).lower()
+                user_error = 'Failed to generate OTP. Please try again.'
+                if 'database' in err_lower or 'migration' in err_lower:
+                    user_error = 'Database error. Please contact support.'
+                elif 'email' in err_lower or 'invalid' in err_lower:
+                    user_error = 'Invalid email address. Please check and try again.'
+                
+                return render(request, 'core/signup/passwordpage.html', {
+                    'email': email,
+                    'errors': [user_error],
+                })
+            
+            # Ensure session is saved before redirect
+            request.session.modified = True
+            try:
+                request.session.save()
+            except Exception:
+                pass
+            
+            return redirect('signup_verify_otp')
         except Exception as e:
-            
-            # Show user-friendly error message
-            err_lower = str(e).lower()
-            user_error = 'Failed to generate OTP. Please try again.'
-            if 'database' in err_lower or 'migration' in err_lower:
-                user_error = 'Database error. Please contact support.'
-            elif 'email' in err_lower or 'invalid' in err_lower:
-                user_error = 'Invalid email address. Please check and try again.'
-            
+            # CATCH-ALL: Log the full traceback so it shows in Render logs
+            logger.error(f"SignupPasswordView.post CRASH: {traceback.format_exc()}")
             return render(request, 'core/signup/passwordpage.html', {
-                'email': email,
-                'errors': [user_error],
+                'email': request.session.get('signup_email', ''),
+                'errors': [f'Unexpected error: {e.__class__.__name__}: {e}'],
             })
-        
-        # Ensure session is saved before redirect
-        request.session.modified = True
-        try:
-            request.session.save()
-        except Exception:
-            pass  # Let redirect still happen; OTP page will show what session exists
-        
-        return redirect('signup_verify_otp')
 
 
 class SigninView(View):
