@@ -34,9 +34,14 @@
     let lastChange = 0;
     let lastCandles = [];
     let tickerTimer = null;
+    let currentInterval = "5m";
+    let isDrawingHLine = false;
+    let drawnLines = [];
 
     function init() {
         initChart();
+        initIntervals();
+        initDrawingTools();
         initActions();
         initSlider();
         initTpSlToggle();
@@ -99,9 +104,68 @@
         return resp.json();
     }
 
+    function initIntervals() {
+        const btns = document.querySelectorAll(".futures-shell .chart-toolbar .interval-btn");
+        btns.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const newInterval = btn.getAttribute("data-interval");
+                if (!newInterval || newInterval === currentInterval) return;
+                
+                btns.forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+                currentInterval = newInterval;
+                loadCandles();
+            });
+        });
+    }
+
+    function initDrawingTools() {
+        const btnHline = document.getElementById("btn-draw-hline");
+        const btnClear = document.getElementById("btn-clear-lines");
+        
+        if (btnHline) {
+            btnHline.addEventListener("click", () => {
+                isDrawingHLine = !isDrawingHLine;
+                btnHline.classList.toggle("active", isDrawingHLine);
+            });
+        }
+        
+        if (btnClear) {
+            btnClear.addEventListener("click", () => {
+                drawnLines.forEach(line => {
+                    if (candleSeries) candleSeries.removePriceLine(line);
+                });
+                drawnLines = [];
+                isDrawingHLine = false;
+                if (btnHline) btnHline.classList.remove("active");
+            });
+        }
+        
+        if (chart) {
+            chart.subscribeClick((param) => {
+                if (!param.point || !isDrawingHLine || !candleSeries) return;
+                const price = candleSeries.coordinateToPrice(param.point.y);
+                if (price !== null) {
+                    const line = candleSeries.createPriceLine({
+                        price: price,
+                        color: '#2962FF',
+                        lineWidth: 2,
+                        lineStyle: LightweightCharts.LineStyle.Solid,
+                        axisLabelVisible: true,
+                        title: 'Draw',
+                    });
+                    drawnLines.push(line);
+                    isDrawingHLine = false;
+                    if (btnHline) btnHline.classList.remove("active");
+                }
+            });
+        }
+    }
+
     async function loadCandles() {
         try {
-            const rows = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=5m&limit=100`);
+            const limit = ["1d", "1w"].includes(currentInterval.toLowerCase()) ? 1000 : 500;
+            const rows = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=${currentInterval}&limit=${limit}`);
             const candles = Array.isArray(rows)
                 ? rows.map((r) => ({
                     time: Math.floor(Number(r[0]) / 1000),
@@ -128,7 +192,7 @@
     let klineSocket = null;
     function connectKlineStream() {
         if (klineSocket) klineSocket.close();
-        const stream = `${SYMBOL.toLowerCase()}@kline_5m`;
+        const stream = `${SYMBOL.toLowerCase()}@kline_${currentInterval}`;
         klineSocket = new WebSocket(`wss://stream.binance.com:9443/ws/${stream}`);
         klineSocket.onmessage = (event) => {
             const payload = JSON.parse(event.data || "{}");

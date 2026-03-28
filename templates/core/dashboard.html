@@ -545,16 +545,20 @@
                                 <div class="chart-section">
                                     <div class="chart-toolbar">
                                         <span>Time</span>
-                                        <span>1s</span>
-                                        <span>15m</span>
-                                        <span>1H</span>
-                                        <span>4H</span>
-                                        <span class="active">1D</span>
-                                        <span>1W</span>
-                                        <span><i class="fas fa-gear"></i></span>
+                                        <span class="interval-btn" data-interval="1m">1m</span>
+                                        <span class="interval-btn active" data-interval="5m">5m</span>
+                                        <span class="interval-btn" data-interval="15m">15m</span>
+                                        <span class="interval-btn" data-interval="1H">1H</span>
+                                        <span class="interval-btn" data-interval="4H">4H</span>
+                                        <span class="interval-btn" data-interval="1D">1D</span>
+                                        <span class="interval-btn" data-interval="1W">1W</span>
                                         <span class="chart-toolbar-spacer">Nexus Charts</span>
                                     </div>
                                     <div class="chart-area" id="chart-bg">
+                                        <div class="drawing-tools">
+                                            <button type="button" class="draw-btn" id="btn-draw-hline" title="Horizontal Line"><i class="fas fa-minus"></i></button>
+                                            <button type="button" class="draw-btn" id="btn-clear-lines" title="Clear Lines"><i class="fas fa-trash"></i></button>
+                                        </div>
                                         <div id="candles-container"></div>
                                         <div class="y-axis">
                                             <span>--</span>

@@ -90,7 +90,13 @@
     align-items: center;
     padding: 0 16px;
     gap: 24px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.futures-shell .ticker-bar::-webkit-scrollbar {
+    display: none;
 }
 
 .futures-shell .ticker-symbol {
@@ -135,7 +141,7 @@
 .futures-shell .ticker-stats {
     display: flex;
     gap: 24px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .futures-shell .stat-item {
@@ -205,8 +211,21 @@
     color: var(--text-secondary);
 }
 
-.futures-shell .chart-toolbar span.active {
+.futures-shell .chart-toolbar .interval-btn {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.futures-shell .chart-toolbar .interval-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.futures-shell .chart-toolbar .interval-btn.active {
     color: var(--color-up);
+    background: var(--color-up-bg);
 }
 
 .futures-shell .chart-toolbar-spacer {
@@ -228,6 +247,46 @@
     inset: 0;
     width: 100%;
     height: 100%;
+    z-index: 1;
+}
+
+.futures-shell .drawing-tools {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg-panel);
+    padding: 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.futures-shell .draw-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.futures-shell .draw-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.futures-shell .draw-btn.active {
+    background: var(--color-up-bg);
+    color: var(--color-up);
 }
 
 .futures-shell .y-axis,
