@@ -32,11 +32,11 @@
             return;
         }
         chart = window.LightweightCharts.createChart(container, {
-            layout: { background: { color: "#0b0e11" }, textColor: "#9aa4b2", attributionLogo: false },
-            grid: { vertLines: { color: "rgba(255,255,255,0.06)" }, horzLines: { color: "rgba(255,255,255,0.06)" } },
-            timeScale: { borderColor: "#20252c", timeVisible: true, secondsVisible: true },
-            rightPriceScale: { borderColor: "#20252c" },
-            crosshair: { mode: 0 },
+            layout: { background: { color: "#080b10" }, textColor: "#6b7785", attributionLogo: false },
+            grid: { vertLines: { color: "rgba(255,255,255,0.018)" }, horzLines: { color: "rgba(255,255,255,0.018)" } },
+            timeScale: { borderColor: "rgba(255,255,255,0.04)", timeVisible: true, secondsVisible: false },
+            rightPriceScale: { borderColor: "rgba(255,255,255,0.04)" },
+            crosshair: { mode: 0, vertLine: { color: "rgba(240, 185, 11, 0.25)", width: 1, style: 2, labelBackgroundColor: "#1a1e26" }, horzLine: { color: "rgba(240, 185, 11, 0.25)", width: 1, style: 2, labelBackgroundColor: "#1a1e26" } },
         });
         if (!chart || typeof chart.addSeries !== "function") {
             chart = null;
@@ -49,20 +49,21 @@
             upColor: "#0ecb81",
             downColor: "#f6465d",
             borderVisible: false,
-            wickUpColor: "#0ecb81",
-            wickDownColor: "#f6465d",
+            wickUpColor: "rgba(14, 203, 129, 0.6)",
+            wickDownColor: "rgba(246, 70, 93, 0.6)",
         });
 
-        volumeSeries = chart.addSeries(LightweightCharts.HistogramSeries, {
-            color: "rgba(0, 192, 118, 0.35)",
-            priceFormat: { type: "volume" },
-            priceScaleId: "",
-            scaleMargins: { top: 0.8, bottom: 0 },
-        });
+        // Volume bars disabled for cleaner chart
+        // volumeSeries = chart.addSeries(LightweightCharts.HistogramSeries, {
+        //     color: "rgba(14, 203, 129, 0.08)",
+        //     priceFormat: { type: "volume" },
+        //     priceScaleId: "",
+        //     scaleMargins: { top: 0.88, bottom: 0 },
+        // });
 
-        ma7Series = chart.addSeries(LightweightCharts.LineSeries, { color: "#f0b90b", lineWidth: 1 });
-        ma25Series = chart.addSeries(LightweightCharts.LineSeries, { color: "#f06292", lineWidth: 1 });
-        ma99Series = chart.addSeries(LightweightCharts.LineSeries, { color: "#5aa9ff", lineWidth: 1 });
+        ma7Series = chart.addSeries(LightweightCharts.LineSeries, { color: "rgba(240, 185, 11, 0.6)", lineWidth: 1, crosshairMarkerVisible: false, lastValueVisible: false, priceLineVisible: false });
+        ma25Series = chart.addSeries(LightweightCharts.LineSeries, { color: "rgba(240, 98, 146, 0.5)", lineWidth: 1, crosshairMarkerVisible: false, lastValueVisible: false, priceLineVisible: false });
+        ma99Series = chart.addSeries(LightweightCharts.LineSeries, { color: "rgba(90, 169, 255, 0.45)", lineWidth: 1, crosshairMarkerVisible: false, lastValueVisible: false, priceLineVisible: false });
 
         tooltip = buildTooltip(container);
         statusEl = buildStatus(container);
@@ -194,16 +195,17 @@
         candleSeries.applyOptions({
             upColor: "#0ecb81",
             downColor: "#f6465d",
-            wickUpColor: "#0ecb81",
-            wickDownColor: "#f6465d",
+            wickUpColor: "rgba(14, 203, 129, 0.6)",
+            wickDownColor: "rgba(246, 70, 93, 0.6)",
         });
     }
 
     function updateVolume() {
+        if (!volumeSeries) return;
         const vols = candles.map((c, i) => ({
             time: c.time,
             value: 40 + (i % 15) * 3,
-            color: c.close >= c.open ? "rgba(0, 192, 118, 0.4)" : "rgba(255, 77, 79, 0.4)",
+            color: c.close >= c.open ? "rgba(14, 203, 129, 0.08)" : "rgba(246, 70, 93, 0.08)",
         }));
         volumeSeries.setData(vols);
     }
@@ -340,8 +342,8 @@
                 candleSeries.applyOptions({
                     upColor: "#0ecb81",
                     downColor: "#f6465d",
-                    wickUpColor: "#0ecb81",
-                    wickDownColor: "#f6465d",
+                    wickUpColor: "rgba(14, 203, 129, 0.6)",
+                    wickDownColor: "rgba(246, 70, 93, 0.6)",
                 });
             };
             klineSocket.onclose = () => { klineSocket = null; };

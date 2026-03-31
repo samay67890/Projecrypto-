@@ -1760,7 +1760,7 @@
         if (!list) return;
         list.innerHTML = "";
         if (!state.positions.length) {
-            list.innerHTML = '<div class="position-item">No open positions</div>';
+            list.innerHTML = '<div class="position-item" style="justify-content:center;color:#4a5568;">No open positions</div>';
             return;
         }
         state.positions.forEach((p) => {
@@ -1796,7 +1796,7 @@
                 openList.appendChild(row);
             });
             if (!(state.marginOpenOrders || []).length) {
-                openList.innerHTML = '<tr><td colspan="7" class="right">No open orders</td></tr>';
+                openList.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#4a5568;padding:18px;">No open orders</td></tr>';
             }
         }
         if (histList) {
@@ -1814,7 +1814,7 @@
                 histList.appendChild(row);
             });
             if (!state.history.orders.length) {
-                histList.innerHTML = '<tr><td colspan="6" class="right">No order history</td></tr>';
+                histList.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#4a5568;padding:18px;">No order history</td></tr>';
             }
         }
 
@@ -1833,7 +1833,7 @@
                 tradeList.appendChild(row);
             });
             if (!state.history.trades.length) {
-                tradeList.innerHTML = '<tr><td colspan="6" class="right">No trade history</td></tr>';
+                tradeList.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#4a5568;padding:18px;">No trade history</td></tr>';
             }
         }
 
@@ -1852,7 +1852,7 @@
                 posList.appendChild(row);
             });
             if (!state.positions.length) {
-                posList.innerHTML = '<tr><td colspan="5" class="right">No open positions</td></tr>';
+                posList.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#4a5568;padding:18px;">No open positions</td></tr>';
             }
         }
     }
@@ -1906,7 +1906,7 @@
         const pnl = (lastPrice - entry) * amount;
         setText("marginRatio", `${ratio.toFixed(2)}%`);
         setText("marginLiq", `$${fmtMoney(Math.max(0, liq))}`);
-        setText("marginBorrowed", `${fmtAsset(borrowed)} ${selectedCoin.symbol}`);
+        setText("marginBorrowed", `$${fmtMoney(borrowed)} USDT`);
         const pnlEl = qs("marginEstPnl");
         if (pnlEl) {
             pnlEl.textContent = `${pnl >= 0 ? "+" : ""}$${fmtMoney(pnl)}`;

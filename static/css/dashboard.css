@@ -1,18 +1,21 @@
 :root {
-    --bg-deep: #060a12;
-    --bg-mid: rgba(15, 20, 30, 0.45);
-    --bg-soft: #161c28;
-    --sidebar-bg: rgba(8, 12, 18, 0.7);
+    --bg-deep: #060910;
+    --bg-mid: rgba(12, 16, 24, 0.55);
+    --bg-soft: #141a26;
+    --sidebar-bg: rgba(6, 9, 16, 0.75);
     --accent: #00e5ff;
     --accent-2: #d500f9;
     --accent-grad: linear-gradient(135deg, #00e5ff, #d500f9);
-    --green: #00ff88;
-    --red: #ff2a5f;
-    --border: rgba(255, 255, 255, 0.08);
-    --text: #f8fafc;
-    --text-dim: #94a3b8;
-    --glow-primary: 0 0 20px rgba(0, 229, 255, 0.4);
-    --glow-secondary: 0 0 20px rgba(213, 0, 249, 0.4);
+    --green: #0ecb81;
+    --red: #f6465d;
+    --border: rgba(255, 255, 255, 0.06);
+    --text: #eaecef;
+    --text-dim: #848e9c;
+    --glow-primary: 0 0 20px rgba(0, 229, 255, 0.3);
+    --glow-secondary: 0 0 20px rgba(213, 0, 249, 0.3);
+    --panel-bg: #0c1017;
+    --panel-border: rgba(255, 255, 255, 0.05);
+    --card-bg: rgba(12, 16, 24, 0.6);
 }
 
 * {
@@ -43,15 +46,15 @@ select {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 34px 34px;
+    background: linear-gradient(160deg, #060910 0%, #0a0e18 40%, #080c14 100%);
 }
 
 .app-header {
     height: 64px;
-    border-bottom: 1px solid var(--border);
-    background: rgba(5, 5, 5, 0.86);
-    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--panel-border);
+    background: rgba(6, 9, 16, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -140,12 +143,29 @@ select {
     top: calc(100% + 8px);
     left: 0;
     right: 0;
-    background: #131820;
-    border: 1px solid #2f3742;
+    background: rgba(14, 16, 22, 0.95);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-radius: 12px;
     max-height: 320px;
     overflow: auto;
     z-index: 40;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.search-results::-webkit-scrollbar {
+    width: 6px;
+}
+.search-results::-webkit-scrollbar-track {
+    background: transparent;
+}
+.search-results::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+.search-results::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
 }
 
 .search-results.show {
@@ -216,12 +236,20 @@ select {
 .sidebar {
     width: 240px;
     background: var(--sidebar-bg);
-    border-right: 1px solid var(--border);
+    border-right: 1px solid var(--panel-border);
     padding: 18px 10px;
     display: flex;
     flex-direction: column;
     gap: 6px;
     overflow-y: auto;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 3px;
+}
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
 }
 
 .side-label {
@@ -253,14 +281,28 @@ select {
 
 .side-link:hover,
 .side-link.active {
-    color: #fff;
-    background: rgba(230, 95, 92, 0.1);
+    color: #eaecef;
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .content-area {
     flex: 1;
     min-height: 0;
     overflow: auto;
+}
+
+.content-area::-webkit-scrollbar {
+    width: 5px;
+}
+.content-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+.content-area::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+}
+.content-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .dashboard-view {
@@ -278,7 +320,7 @@ select {
     display: grid;
     grid-template-columns: 1fr 300px 330px;
     gap: 1px;
-    background: var(--border);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .panel {
@@ -290,7 +332,7 @@ select {
 }
 
 .panel-border {
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--panel-border);
 }
 
 .pair-info {
@@ -345,14 +387,13 @@ select {
     flex: 1;
     height: 380px;
     min-height: 320px;
-    border-radius: 12px;
-    background: #090d10;
-    border: 1px solid #1f262f;
-    background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 44px 44px;
+    border-radius: 14px;
+    background: #080b10;
+    border: 1px solid rgba(255, 255, 255, 0.05);
     padding: 8px;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 0 50px rgba(0, 229, 255, 0.03), 0 0 100px rgba(0, 0, 0, 0.4);
 }
 
 .chart-container canvas {
@@ -382,10 +423,15 @@ select {
 }
 
 .summary-card {
-    padding: 10px;
-    border-radius: 10px;
-    background: var(--bg-mid);
-    border: 1px solid #1f262f;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--panel-border);
+    transition: border-color 0.2s;
+}
+
+.summary-card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .summary-card label {
@@ -464,12 +510,18 @@ select {
 }
 
 .input-box {
-    background: #181b20;
-    border: 1px solid #2c333d;
+    background: rgba(14, 16, 22, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
     padding: 10px 12px;
     position: relative;
     margin-bottom: 12px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-box:focus-within {
+    border-color: rgba(0, 229, 255, 0.25);
+    box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.06);
 }
 
 .input-box label {
@@ -483,7 +535,7 @@ select {
     border: none;
     outline: none;
     background: transparent;
-    color: #fff;
+    color: var(--text);
     width: 100%;
     font-size: 16px;
     font-weight: 700;
@@ -507,27 +559,52 @@ select {
 .btn-buy,
 .btn-sell {
     border: none;
-    border-radius: 9px;
+    border-radius: 10px;
     padding: 13px;
-    color: #fff;
+    color: #0b0e11;
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-buy::after,
+.btn-sell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+    pointer-events: none;
 }
 
 .btn-buy {
-    background: var(--green);
+    background: linear-gradient(135deg, #0ecb81, #0ba36a);
     margin-bottom: 8px;
+    box-shadow: 0 2px 12px rgba(14, 203, 129, 0.2);
+}
+
+.btn-buy:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(14, 203, 129, 0.35);
 }
 
 .btn-sell {
-    background: var(--red);
+    background: linear-gradient(135deg, #f6465d, #d63a4f);
+    box-shadow: 0 2px 12px rgba(246, 70, 93, 0.2);
+}
+
+.btn-sell:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(246, 70, 93, 0.35);
 }
 
 .pnl-card {
     margin-top: auto;
-    background: #181b20;
-    border-radius: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
     padding: 14px;
 }
 
@@ -550,13 +627,11 @@ select {
 .fiat-spot-view,
 .earn-view {
     padding: 16px;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-    background-size: 30px 30px;
 }
 
 .fiat-balance-card {
-    background: var(--bg-mid);
-    border: 1px solid #1b1f24;
+    background: var(--card-bg);
+    border: 1px solid var(--panel-border);
     border-radius: 20px;
     padding: 32px;
     margin-bottom: 20px;
@@ -570,7 +645,7 @@ select {
     right: -50px;
     width: 220px;
     height: 220px;
-    background: radial-gradient(circle, rgba(230, 95, 92, 0.17) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(0, 229, 255, 0.08) 0%, transparent 70%);
 }
 
 .fiat-balance-card span {
@@ -627,8 +702,8 @@ select {
 }
 
 .asset-table-wrap {
-    background: var(--bg-mid);
-    border: 1px solid #1b1f24;
+    background: var(--card-bg);
+    border: 1px solid var(--panel-border);
     border-radius: 20px;
     padding: 10px 16px;
     overflow-x: auto;
@@ -741,21 +816,20 @@ tbody tr:last-child {
 .margin-chart {
     flex: 1;
     min-height: 240px;
-    border: 1px solid #1e2329;
-    background: #0b0e11;
-    border-radius: 12px;
-    background-image: radial-gradient(#222 1px, transparent 1px);
-    background-size: 20px 20px;
+    border: 1px solid var(--panel-border);
+    background: #080b10;
+    border-radius: 14px;
+    box-shadow: 0 0 40px rgba(0, 229, 255, 0.02);
 }
 
 .positions-wrap,
 .futures-positions-wrap,
 .futures-trades-wrap {
     margin-top: 14px;
-    background: var(--bg-mid);
-    border: 1px solid #1f252e;
-    border-radius: 12px;
-    padding: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 12px;
 }
 
 .position-head {
@@ -841,8 +915,8 @@ tbody tr:last-child {
 }
 
 .simple-panel {
-    background: var(--bg-mid);
-    border: 1px solid #1a1a1a;
+    background: var(--card-bg);
+    border: 1px solid var(--panel-border);
     border-radius: 16px;
     padding: 24px;
 }
@@ -1396,8 +1470,6 @@ tbody tr:last-child {
     display: flex;
     flex-direction: column;
     gap: 18px;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-    background-size: 30px 30px;
 }
 
 .ident-head h1 {
@@ -1419,8 +1491,8 @@ tbody tr:last-child {
 }
 
 .ident-card {
-    background: var(--bg-mid);
-    border: 1px solid #1f252e;
+    background: var(--card-bg);
+    border: 1px solid var(--panel-border);
     border-radius: 16px;
     padding: 22px;
 }

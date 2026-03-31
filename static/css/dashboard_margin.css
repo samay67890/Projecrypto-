@@ -9,18 +9,21 @@
     flex-direction: column;
     height: 100%;
     min-height: calc(100vh - 110px);
-    background: #0b0e11;
-    border: 1px solid #20252c;
+    background: #0a0d12;
+    border: 1px solid rgba(255, 255, 255, 0.06);
     overflow: hidden;
 }
 
+/* ── Top Bar ── */
 .margin-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid #20252c;
-    background: #181a20;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(135deg, rgba(24, 26, 32, 0.95), rgba(14, 16, 22, 0.95));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .margin-pair {
@@ -30,15 +33,23 @@
 }
 
 .margin-pair-icon {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
-    background: #f0b90b;
+    background: linear-gradient(135deg, #f0b90b, #d4a017);
     color: #0b0e11;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
+    font-size: 15px;
+    box-shadow: 0 0 14px rgba(240, 185, 11, 0.3);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.margin-pair-icon:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 22px rgba(240, 185, 11, 0.45);
 }
 
 .margin-pair-title {
@@ -47,25 +58,34 @@
     gap: 8px;
     font-size: 15px;
     font-weight: 700;
+    letter-spacing: 0.3px;
 }
 
 .margin-pair-sub {
-    color: #848e9c;
+    color: #6b7785;
     font-size: 11px;
+    letter-spacing: 0.4px;
 }
 
 .margin-pill {
     font-size: 10px;
     font-weight: 600;
-    padding: 2px 6px;
+    padding: 3px 8px;
     border-radius: 999px;
     background: rgba(240, 185, 11, 0.12);
     color: #f0b90b;
+    border: 1px solid rgba(240, 185, 11, 0.2);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.margin-pill:hover {
+    background: rgba(240, 185, 11, 0.2);
+    box-shadow: 0 0 8px rgba(240, 185, 11, 0.2);
 }
 
 .margin-stats {
     display: flex;
-    gap: 16px;
+    gap: 20px;
     flex-wrap: wrap;
     justify-content: flex-end;
 }
@@ -79,21 +99,26 @@
 }
 
 .margin-stat .label {
-    color: #848e9c;
+    color: #6b7785;
     font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.8px;
 }
 
 .margin-stat .value {
     font-size: 14px;
     font-weight: 700;
+    background: linear-gradient(90deg, #eaecef, #b0b8c4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
+/* ── Body Layout ── */
 .margin-body {
     display: flex;
     gap: 1px;
-    background: #20252c;
+    background: rgba(32, 37, 44, 0.5);
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -102,7 +127,7 @@
 .margin-orderbook,
 .margin-main,
 .margin-right {
-    background: #0b0e11;
+    background: #0a0d12;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -111,7 +136,7 @@
 .margin-orderbook {
     width: 270px;
     flex: 0 0 270px;
-    border-right: 1px solid #20252c;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .margin-main {
@@ -120,21 +145,26 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    background: #0a0d12;
 }
 
 .margin-right {
     width: 320px;
     flex: 0 0 320px;
-    border-left: 1px solid #20252c;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ── Panel Headers ── */
 .margin-panel-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px;
-    border-bottom: 1px solid #20252c;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     font-weight: 700;
+    font-size: 13px;
+    color: #d1d5db;
+    letter-spacing: 0.2px;
 }
 
 .panel-actions {
@@ -144,24 +174,31 @@
 
 .icon-btn {
     border: none;
-    background: #14181f;
-    color: #848e9c;
+    background: rgba(20, 24, 31, 0.6);
+    color: #6b7785;
     padding: 6px 8px;
     border-radius: 6px;
     cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
 }
 
 .icon-btn:hover {
-    color: #fff;
+    color: #f0b90b;
+    background: rgba(240, 185, 11, 0.08);
+    border-color: rgba(240, 185, 11, 0.15);
 }
 
+/* ── Order Book ── */
 .margin-ob-head {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     padding: 8px 12px;
-    color: #848e9c;
+    color: #6b7785;
     font-size: 11px;
-    border-bottom: 1px solid #20252c;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .margin-ob-scroll {
@@ -169,11 +206,26 @@
     overflow: auto;
 }
 
+/* Custom scrollbar for order book */
+.margin-ob-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.margin-ob-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.margin-ob-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+}
+.margin-ob-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
 .margin-ob-list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 6px 10px;
+    gap: 1px;
+    padding: 4px 10px;
     font-family: "IBM Plex Mono", monospace;
     font-size: 12px;
 }
@@ -186,6 +238,11 @@
     padding: 4px 6px;
     border-radius: 4px;
     overflow: hidden;
+    transition: background 0.15s ease;
+}
+
+.margin-ob-row:hover {
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .margin-ob-row::before {
@@ -193,17 +250,18 @@
     position: absolute;
     inset: 0 0 0 auto;
     width: var(--depth, 0%);
-    background: rgba(0, 192, 118, 0.12);
+    background: rgba(14, 203, 129, 0.1);
     z-index: 0;
-    transition: width 0.25s ease;
+    transition: width 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .margin-ob-row.sell::before {
-    background: rgba(255, 77, 79, 0.12);
+    background: rgba(246, 70, 93, 0.1);
 }
 
 .margin-ob-row.best {
-    box-shadow: inset 0 0 0 1px rgba(240, 185, 11, 0.5);
+    box-shadow: inset 0 0 0 1px rgba(240, 185, 11, 0.4);
+    background: rgba(240, 185, 11, 0.04);
 }
 
 .margin-ob-row span {
@@ -212,37 +270,35 @@
 }
 
 .margin-ob-row.buy {
-    color: #00c076;
+    color: #0ecb81;
 }
 
 .margin-ob-row.sell {
-    color: #ff4d4f;
+    color: #f6465d;
 }
 
+/* ── Mid Price ── */
 .margin-mid-price {
-    padding: 10px 12px;
-    border-top: 1px solid #20252c;
-    border-bottom: 1px solid #20252c;
+    padding: 12px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     text-align: center;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
+    background: linear-gradient(180deg, rgba(14, 203, 129, 0.04), transparent);
+    letter-spacing: 0.5px;
 }
 
 .margin-mid-price .sub {
-    color: #848e9c;
+    color: #6b7785;
     font-size: 11px;
-    margin-left: 6px;
+    margin-left: 8px;
+    font-weight: 400;
 }
 
-.margin-main {
-    background: #0b0e11;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
+/* ── Chart Area ── */
 .margin-chart-panel {
-    border-bottom: 1px solid #20252c;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -253,28 +309,37 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid #20252c;
-    color: #848e9c;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: #6b7785;
     font-size: 11px;
 }
 
 .margin-terminal .tabs-left {
     display: flex;
-    gap: 8px;
+    gap: 4px;
 }
 
 .margin-terminal .tab {
     border: none;
     background: transparent;
-    color: inherit;
+    color: #6b7785;
     font-size: 11px;
     cursor: pointer;
-    padding: 6px 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.margin-terminal .tab:hover {
+    color: #d1d5db;
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .margin-terminal .tab.active {
     color: #fff;
+    background: rgba(240, 185, 11, 0.08);
     border-bottom: 2px solid #f0b90b;
 }
 
@@ -282,27 +347,44 @@
     position: relative;
     flex: 1 1 auto;
     min-height: 340px;
-    background: #0b0e11;
+    background: #080b10;
     overflow: hidden;
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 229, 255, 0.015);
+}
+
+.margin-chart-wrap::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 60%;
+    height: 70%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(ellipse, rgba(240, 185, 11, 0.015) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
 }
 
 #marginChart {
     position: absolute;
     inset: 0;
+    z-index: 1;
 }
 
 .chart-status {
     position: absolute;
     right: 12px;
     top: 12px;
-    padding: 6px 10px;
+    padding: 6px 12px;
     border-radius: 8px;
-    background: rgba(20, 24, 31, 0.8);
-    border: 1px solid #20252c;
+    background: rgba(20, 24, 31, 0.85);
+    border: 1px solid rgba(240, 185, 11, 0.2);
     color: #f0b90b;
     font-size: 11px;
     pointer-events: none;
     z-index: 4;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .margin-chart-wrap #marginChart,
@@ -312,17 +394,22 @@
     display: block;
 }
 
+/* ── MA Overlay ── */
 .margin-chart-overlay {
     position: absolute;
     top: 10px;
     left: 12px;
     display: flex;
-    gap: 12px;
+    gap: 14px;
     font-size: 11px;
-    background: rgba(24, 26, 32, 0.7);
-    border: 1px solid #20252c;
-    padding: 6px 8px;
+    background: rgba(14, 16, 22, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 6px 10px;
     border-radius: 8px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    font-family: "IBM Plex Mono", monospace;
+    z-index: 2;
 }
 
 .margin-chart-overlay .ma7 {
@@ -337,58 +424,86 @@
     color: #5aa9ff;
 }
 
+/* ── Quick Trade Cards ── */
 .margin-quick-trade {
     position: absolute;
-    bottom: 8px;
-    left: 12px;
+    bottom: 6px;
+    left: 10px;
     display: flex;
-    gap: 8px;
+    gap: 5px;
     align-items: center;
     z-index: 3;
-    opacity: 0.85;
-    transition: opacity 0.2s;
+    opacity: 0.45;
+    transition: opacity 0.3s ease;
+    pointer-events: auto;
 }
 
 .margin-quick-trade:hover {
-    opacity: 1;
+    opacity: 0.92;
 }
 
 .quick-card,
 .quick-input {
-    background: #181a20;
-    border: 1px solid #20252c;
-    border-radius: 10px;
-    padding: 8px 10px;
+    background: rgba(14, 16, 22, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 4px 8px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     align-items: center;
-    min-width: 90px;
+    min-width: 68px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+    font-size: 10px;
+}
+
+.quick-card .label,
+.quick-input .label {
+    font-size: 9px;
+    opacity: 0.7;
+}
+
+.quick-card .value {
+    font-size: 10px;
 }
 
 .quick-card.buy {
-    background: #00c076;
-    color: #0b0e11;
-    font-weight: 700;
+    background: rgba(14, 203, 129, 0.15);
+    color: #0ecb81;
+    font-weight: 600;
+    border-color: rgba(14, 203, 129, 0.2);
+}
+
+.quick-card.buy:hover {
+    background: rgba(14, 203, 129, 0.25);
 }
 
 .quick-card.sell {
-    background: #ff4d4f;
-    color: #0b0e11;
-    font-weight: 700;
+    background: rgba(246, 70, 93, 0.15);
+    color: #f6465d;
+    font-weight: 600;
+    border-color: rgba(246, 70, 93, 0.2);
+}
+
+.quick-card.sell:hover {
+    background: rgba(246, 70, 93, 0.25);
 }
 
 .quick-input input {
     border: none;
     background: transparent;
-    color: #fff;
+    color: #9aa4b2;
     text-align: center;
     outline: none;
-    font-size: 12px;
+    font-size: 10px;
+    width: 70px;
 }
 
+/* ── Trade Panel ── */
 .margin-trade-panel {
-    padding: 12px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -397,16 +512,16 @@
 
 .margin-terminal .trade-tabs {
     display: flex;
-    gap: 10px;
-    border-bottom: 1px solid #20252c;
-    padding-bottom: 6px;
-    color: #848e9c;
+    gap: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 8px;
+    color: #6b7785;
 }
 
 .margin-terminal .trade-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 16px;
 }
 
 .margin-terminal .trade-side {
@@ -417,73 +532,187 @@
 
 .margin-terminal .trade-mode {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .margin-terminal .pill {
-    border: none;
-    background: #14181f;
-    color: #848e9c;
-    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(20, 24, 31, 0.6);
+    color: #6b7785;
+    padding: 6px 12px;
     border-radius: 8px;
     cursor: pointer;
     font-size: 11px;
+    transition: all 0.2s ease;
+}
+
+.margin-terminal .pill:hover {
+    color: #d1d5db;
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .margin-terminal .pill.active {
-    background: #1f252e;
+    background: rgba(240, 185, 11, 0.1);
     color: #fff;
+    border-color: rgba(240, 185, 11, 0.25);
 }
 
 .margin-terminal .trade-field label {
     display: block;
     font-size: 11px;
-    color: #848e9c;
+    color: #6b7785;
     margin-bottom: 4px;
+    letter-spacing: 0.3px;
 }
 
 .margin-terminal .field-input {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #181a20;
-    border: 1px solid #20252c;
+    background: rgba(14, 16, 22, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
-    padding: 8px 10px;
+    padding: 9px 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.margin-terminal .field-input:focus-within {
+    border-color: rgba(240, 185, 11, 0.35);
+    box-shadow: 0 0 0 2px rgba(240, 185, 11, 0.08);
 }
 
 .margin-terminal .field-input.readonly {
-    border-color: #f0b90b;
+    border-color: rgba(240, 185, 11, 0.3);
+    background: rgba(240, 185, 11, 0.04);
 }
 
 .margin-terminal .field-input input {
     border: none;
     background: transparent;
-    color: #fff;
+    color: #eaecef;
     width: 100%;
     outline: none;
-    font-size: 12px;
+    font-size: 13px;
     text-align: right;
+    font-family: "IBM Plex Mono", monospace;
 }
 
+.margin-terminal .field-input span {
+    color: #6b7785;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+/* ── Range Slider ── */
 .margin-terminal .trade-range {
     width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #0ecb81, #f0b90b);
+    outline: none;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    margin: 4px 0;
 }
 
+.margin-terminal .trade-range:hover {
+    opacity: 1;
+}
+
+.margin-terminal .trade-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f0b90b;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(240, 185, 11, 0.4);
+    transition: box-shadow 0.2s ease;
+}
+
+.margin-terminal .trade-range::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 14px rgba(240, 185, 11, 0.6);
+}
+
+.margin-terminal .trade-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f0b90b;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 8px rgba(240, 185, 11, 0.4);
+}
+
+/* ── Trade Actions (Buy / Sell Buttons) ── */
 .margin-terminal .trade-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
 }
 
+.margin-terminal .btn-buy,
+.margin-terminal .btn-sell {
+    border: none;
+    padding: 11px 0;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.margin-terminal .btn-buy::after,
+.margin-terminal .btn-sell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+.margin-terminal .btn-buy {
+    background: linear-gradient(135deg, #0ecb81, #0ba36a);
+    color: #0b0e11;
+    box-shadow: 0 2px 10px rgba(14, 203, 129, 0.25);
+}
+
+.margin-terminal .btn-sell {
+    background: linear-gradient(135deg, #f6465d, #d63a4f);
+    color: #0b0e11;
+    box-shadow: 0 2px 10px rgba(246, 70, 93, 0.25);
+}
+
+.margin-terminal .btn-buy:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(14, 203, 129, 0.4);
+}
+
+.margin-terminal .btn-sell:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(246, 70, 93, 0.4);
+}
+
+.margin-terminal .btn-buy:active,
+.margin-terminal .btn-sell:active {
+    transform: translateY(0);
+}
+
+/* ── Trade Meta ── */
 .margin-terminal .trade-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    color: #848e9c;
+    color: #6b7785;
     font-size: 12px;
 }
 
+/* ── Leverage Choices ── */
 .leverage-choices {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -491,48 +720,68 @@
 }
 
 .lev-btn {
-    border: 1px solid #20252c;
-    background: #14181f;
-    color: #848e9c;
-    padding: 6px 0;
-    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(20, 24, 31, 0.6);
+    color: #6b7785;
+    padding: 7px 0;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 11px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.lev-btn:hover {
+    border-color: rgba(240, 185, 11, 0.3);
+    color: #d1d5db;
+    background: rgba(240, 185, 11, 0.05);
 }
 
 .lev-btn.active {
     border-color: #f0b90b;
-    color: #fff;
+    color: #f0b90b;
+    background: rgba(240, 185, 11, 0.1);
+    box-shadow: 0 0 8px rgba(240, 185, 11, 0.15);
 }
 
+/* ── Margin Metrics ── */
 .margin-metrics {
-    border: 1px solid #20252c;
-    border-radius: 10px;
-    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    padding: 10px 12px;
     display: grid;
-    gap: 6px;
+    gap: 8px;
     font-size: 11px;
-    color: #848e9c;
+    color: #6b7785;
+    background: rgba(14, 16, 22, 0.5);
 }
 
 .margin-metrics .metric-row {
     display: flex;
     justify-content: space-between;
+    padding: 2px 0;
 }
 
+.margin-metrics .metric-row span:last-child {
+    color: #d1d5db;
+    font-family: "IBM Plex Mono", monospace;
+}
+
+/* ── Positions ── */
 .margin-terminal .positions-wrap {
-    background: #14181f;
-    border: 1px solid #20252c;
+    background: rgba(14, 16, 22, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 12px;
-    padding: 10px;
+    padding: 12px;
 }
 
 .margin-terminal .position-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     font-size: 13px;
+    font-weight: 600;
 }
 
 .margin-terminal .positions-list {
@@ -543,108 +792,130 @@
     gap: 8px;
 }
 
+.margin-terminal .positions-list::-webkit-scrollbar {
+    width: 3px;
+}
+.margin-terminal .positions-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
 .margin-terminal .position-item {
-    border: 1px solid #20252c;
-    border-radius: 8px;
-    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 10px 12px;
     font-size: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    color: #848e9c;
+    color: #6b7785;
+    background: rgba(20, 24, 31, 0.4);
+    transition: all 0.2s ease;
 }
 
-.margin-terminal .position-item.long,
+.margin-terminal .position-item:hover {
+    background: rgba(20, 24, 31, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.margin-terminal .position-item.long {
+    color: #eaecef;
+    border-left: 3px solid #0ecb81;
+}
+
 .margin-terminal .position-item.short {
     color: #eaecef;
+    border-left: 3px solid #f6465d;
 }
 
-.margin-terminal .btn-buy,
-.margin-terminal .btn-sell {
-    border: none;
-    padding: 10px 0;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    cursor: pointer;
-    transition: filter 0.15s;
-}
-
-.margin-terminal .btn-buy {
-    background: #00c076;
-    color: #0b0e11;
-}
-
-.margin-terminal .btn-sell {
-    background: #ff4d4f;
-    color: #0b0e11;
-}
-
-.margin-terminal .btn-buy:hover,
-.margin-terminal .btn-sell:hover {
-    filter: brightness(1.1);
-}
-
+/* ── Mini / Outline Buttons ── */
 .margin-terminal .mini-btn {
-    border: 1px solid #f0b90b;
-    background: rgba(240, 185, 11, 0.1);
+    border: 1px solid rgba(240, 185, 11, 0.3);
+    background: rgba(240, 185, 11, 0.08);
     color: #f0b90b;
-    padding: 4px 10px;
-    border-radius: 6px;
+    padding: 5px 12px;
+    border-radius: 8px;
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.margin-terminal .mini-btn:hover {
+    background: rgba(240, 185, 11, 0.15);
+    box-shadow: 0 0 10px rgba(240, 185, 11, 0.2);
 }
 
 .margin-terminal .outline-btn {
-    border: 1px solid #20252c;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     background: transparent;
-    color: #848e9c;
-    padding: 5px 12px;
-    border-radius: 6px;
+    color: #6b7785;
+    padding: 6px 14px;
+    border-radius: 8px;
     font-size: 11px;
     cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
+    transition: all 0.2s ease;
 }
 
 .margin-terminal .outline-btn:hover {
     border-color: #f0b90b;
     color: #f0b90b;
+    background: rgba(240, 185, 11, 0.05);
 }
 
+/* ── Right Panel ── */
 .margin-right {
-    border-left: 1px solid #20252c;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .margin-search {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
-    border-bottom: 1px solid #20252c;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.margin-search i {
+    color: #6b7785;
+    font-size: 12px;
 }
 
 .margin-search input {
     border: none;
     background: transparent;
-    color: #fff;
+    color: #eaecef;
     width: 100%;
     outline: none;
     font-size: 12px;
 }
 
+.margin-search input::placeholder {
+    color: #4a5568;
+}
+
 .margin-market-tabs {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     padding: 8px 12px;
-    border-bottom: 1px solid #20252c;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .margin-market-table,
 .margin-trades {
     flex: 1;
     overflow: auto;
+}
+
+.margin-market-table::-webkit-scrollbar,
+.margin-trades::-webkit-scrollbar {
+    width: 3px;
+}
+.margin-market-table::-webkit-scrollbar-thumb,
+.margin-trades::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
 }
 
 .margin-market-table table,
@@ -659,38 +930,67 @@
 .margin-trades th,
 .margin-trades td {
     padding: 8px 10px;
-    border-bottom: 1px solid #20252c;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.margin-market-table th,
+.margin-trades th {
+    color: #6b7785;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 10px;
 }
 
 .margin-market-table tbody tr {
     cursor: pointer;
+    transition: background 0.15s ease;
 }
 
 .margin-market-table tbody tr:hover {
-    background: #14181f;
+    background: rgba(240, 185, 11, 0.04);
 }
 
+.margin-market-table tbody tr:active {
+    background: rgba(240, 185, 11, 0.08);
+}
+
+/* ── Footer ── */
 .margin-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
-    border-top: 1px solid #20252c;
-    background: #181a20;
+    padding: 10px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(180deg, rgba(24, 26, 32, 0.9), rgba(14, 16, 22, 0.95));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .footer-tabs {
     display: flex;
-    gap: 10px;
-    color: #848e9c;
+    gap: 6px;
+    color: #6b7785;
 }
 
 .footer-actions {
     display: flex;
     align-items: center;
     gap: 12px;
-    color: #848e9c;
+    color: #6b7785;
     font-size: 11px;
+}
+
+.footer-actions label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.footer-actions label:hover {
+    color: #d1d5db;
 }
 
 .footer-actions button {
@@ -698,12 +998,19 @@
     border: none;
     color: #f0b90b;
     cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.2s;
 }
 
+.footer-actions button:hover {
+    opacity: 0.8;
+}
+
+/* ── Orders Panel ── */
 .margin-orders-panel {
-    border-top: 1px solid #20252c;
-    background: #0b0e11;
-    padding: 8px 12px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: #0a0d12;
+    padding: 8px 14px 14px;
     flex: 0 0 auto;
 }
 
@@ -713,14 +1020,22 @@
     overflow: auto;
 }
 
+.margin-orders-table::-webkit-scrollbar {
+    width: 3px;
+}
+.margin-orders-table::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+}
+
 .margin-orders-table.active {
     display: block;
 }
 
 .margin-orders-table td[colspan] {
-    color: #848e9c;
+    color: #4a5568;
     text-align: center;
-    padding: 18px;
+    padding: 22px;
     font-size: 12px;
 }
 
@@ -730,30 +1045,62 @@
     font-size: 11px;
 }
 
+.margin-orders-table th {
+    color: #6b7785;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-size: 10px;
+}
+
 .margin-orders-table th,
 .margin-orders-table td {
     padding: 8px 10px;
-    border-bottom: 1px solid #20252c;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .margin-orders-table button {
     border: none;
-    background: #14181f;
+    background: rgba(240, 185, 11, 0.1);
     color: #f0b90b;
-    padding: 4px 8px;
+    padding: 5px 10px;
     border-radius: 6px;
     cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    transition: all 0.2s ease;
 }
 
+.margin-orders-table button:hover {
+    background: rgba(240, 185, 11, 0.2);
+}
+
+/* ── Utility ── */
 .right {
     text-align: right;
 }
 
 .muted {
-    color: #848e9c;
+    color: #6b7785;
     font-size: 11px;
 }
 
+/* ── Animations ── */
+@keyframes marginPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+@keyframes marginSlideIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.margin-terminal .position-item {
+    animation: marginSlideIn 0.3s ease forwards;
+}
+
+/* ── Responsive ── */
 @media (max-width: 1280px) {
     .margin-orderbook {
         width: 240px;
@@ -772,7 +1119,7 @@
         width: 100%;
         flex-basis: auto;
         border-right: none;
-        border-bottom: 1px solid #20252c;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
     .margin-right {
         display: none;
@@ -790,4 +1137,3 @@
         justify-content: space-between;
     }
 }
-
