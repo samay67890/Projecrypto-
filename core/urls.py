@@ -1,3 +1,4 @@
+
 from django.urls import path
 
 from . import views
@@ -25,7 +26,16 @@ urlpatterns = [
     path('api/candles/', views.candles, name='candles'),
     path('api/ticker/', views.ticker, name='ticker'),
     path('api/orderbook/', views.orderbook, name='orderbook'),
-    path('api/order', views.order, name='order'),
+    path('api/wallet/', views.wallet_data, name='wallet_data'),
+    path('api/deposit/simulate/', views.deposit_simulate, name='deposit_simulate'),
+    path('api/positions/', views.positions_data, name='positions_data'),
+    path('api/portfolio/', views.portfolio_summary, name='portfolio_summary'),
+    path('api/transactions/', views.transactions_data, name='transactions_data'),
+    path('api/order/', views.order, name='order'),
+    path('api/margin/order/', views.margin_order, name='margin_order'),
+    path('api/margin/close-all/', views.margin_close_all, name='margin_close_all'),
+    path('api/futures/order/', views.futures_order, name='futures_order'),
+    path('api/futures/close-all/', views.futures_close_all, name='futures_close_all'),
     path('api/coingecko/markets/', views.coingecko_markets, name='coingecko_markets'),
     path('api/coingecko/simple-price/', views.coingecko_simple_price, name='coingecko_simple_price'),
     path('api/coingecko/market-chart/', views.coingecko_market_chart, name='coingecko_market_chart'),

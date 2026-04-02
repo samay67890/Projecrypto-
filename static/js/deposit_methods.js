@@ -17,6 +17,21 @@ const confirmAmountBtn = document.getElementById("confirmAmountBtn");
 const payNowBtn = document.getElementById("payNowBtn");
 const methodSearch = document.getElementById("methodSearch");
 
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 function showStep(id) {
     document.querySelectorAll(".step").forEach((step) => step.classList.remove("active"));
     const target = document.getElementById(id);
@@ -62,17 +77,21 @@ function renderPaymentArea() {
     `;
 }
 
-function verifyTransaction() {
+async function verifyTransaction() {
     payNowBtn.innerHTML = '<div class="loader" style="width:18px;height:18px;border-width:2px;margin:0 auto;"></div>';
     payNowBtn.disabled = true;
 
-    setTimeout(() => {
-        payNowBtn.disabled = false;
-        payNowBtn.textContent = "Pay Now";
-        recordDepositTransaction();
+    try {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        await recordDepositTransaction();
         document.getElementById("finalAmt").innerText = Number(currentAmount).toLocaleString();
         showStep("stepSuccess");
-    }, 1800);
+    } catch (error) {
+        alert(error.message || "Deposit could not be completed.");
+    } finally {
+        payNowBtn.disabled = false;
+        payNowBtn.textContent = "Pay Now";
+    }
 }
 
 function stamp(d) {
@@ -89,86 +108,63 @@ function fmtMoney(value) {
     return Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function loadDashboardState() {
-    const fallback = {
-        usdt: STARTING_USDT,
-        asset: 0,
-        wallet: { USDT: STARTING_USDT, BTC: 0 },
-        positions: [],
-        futuresPositions: [],
-        history: { orders: [], trades: [], transactions: [] },
-    };
-
+async function syncDepositToLocalState(payload) {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
-
+    if (!raw) return;
     try {
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== "object") return fallback;
-
-        if (!parsed.wallet || typeof parsed.wallet !== "object") {
-            parsed.wallet = { USDT: STARTING_USDT, BTC: 0 };
+        const state = JSON.parse(raw);
+        if (!state || typeof state !== "object") return;
+        const assets = payload?.wallet?.assets && typeof payload.wallet.assets === "object" ? payload.wallet.assets : {};
+        state.wallet = { ...(state.wallet || {}), ...assets };
+        state.usdt = Number(assets.USDT || payload?.wallet?.usdt || state.usdt || STARTING_USDT);
+        if (!state.history || typeof state.history !== "object") {
+            state.history = { orders: [], trades: [], transactions: [] };
         }
-        if (!Number.isFinite(Number(parsed.wallet.USDT))) {
-            parsed.wallet.USDT = Number.isFinite(Number(parsed.usdt)) ? Number(parsed.usdt) : STARTING_USDT;
+        if (!Array.isArray(state.history.transactions)) {
+            state.history.transactions = [];
         }
-        if (!parsed.history || typeof parsed.history !== "object") {
-            parsed.history = { orders: [], trades: [], transactions: [] };
+        const historyRow = payload?.history_rows?.transaction;
+        if (historyRow) {
+            state.history.transactions.unshift({
+                ...historyRow,
+                time: stamp(new Date(historyRow.time || Date.now())),
+            });
+            state.history.transactions = state.history.transactions.slice(0, 200);
         }
-        if (!Array.isArray(parsed.history.transactions)) {
-            parsed.history.transactions = [];
-        }
-
-        return parsed;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
-        return fallback;
+        console.error("Unable to sync local deposit cache.", error);
     }
 }
 
-function saveDashboardState(state) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
-function recordDepositTransaction() {
+async function recordDepositTransaction() {
     const amount = Number(currentAmount);
-    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Please enter a valid deposit amount.");
+    }
 
-    const state = loadDashboardState();
     const methodText = String(currentMethod || "").toLowerCase();
     const depositAsset = methodText.includes("bitcoin")
         ? "BTC"
         : (methodText.includes("ethereum") ? "ETH" : "USDT");
 
-    if (!state.wallet || typeof state.wallet !== "object") state.wallet = {};
-    const currentAssetBalance = Math.max(0, Number(state.wallet[depositAsset] || 0));
-    state.wallet[depositAsset] = currentAssetBalance + amount;
-    if (depositAsset === "USDT") {
-        state.usdt = state.wallet.USDT;
-    }
-
-    if (!state.history || typeof state.history !== "object") {
-        state.history = { orders: [], trades: [], transactions: [] };
-    }
-    if (!Array.isArray(state.history.transactions)) {
-        state.history.transactions = [];
-    }
-
-    const txRef = `DP-${Date.now()}-${Math.floor(Math.random() * 1000000).toString().padStart(6, "0")}`;
-    state.history.transactions.unshift({
-        time: stamp(new Date()),
-        asset: depositAsset,
-        type: "Deposit",
-        amount: `+${fmtMoney(amount)}`,
-        status: "Completed",
-        txRef,
-        details: `${currentMethod} deposit credited to ${depositAsset} wallet (${txRef})`,
+    const response = await fetch("/api/deposit/simulate/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify({
+            amount,
+            asset: depositAsset,
+            method: currentMethod,
+        }),
     });
-
-    if (state.history.transactions.length > 200) {
-        state.history.transactions = state.history.transactions.slice(0, 200);
+    const payload = await response.json();
+    if (!response.ok) {
+        throw new Error(payload?.message || payload?.error || "Deposit failed");
     }
-
-    saveDashboardState(state);
+    await syncDepositToLocalState(payload);
 }
 
 document.querySelectorAll(".method-card").forEach((card) => {

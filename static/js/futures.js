@@ -37,6 +37,7 @@
     let currentInterval = "5m";
     let isDrawingHLine = false;
     let drawnLines = [];
+    let fundingTimer = null;
 
     function init() {
         initChart();
@@ -50,11 +51,13 @@
         loadTicker();
         loadOrderBook();
         loadRecentTrades();
+        loadFundingInfo();
         if (window.nexusTradeApi && typeof window.nexusTradeApi.renderFuturesPositions === "function") {
             window.nexusTradeApi.renderFuturesPositions();
         }
         tickerTimer = setInterval(loadTicker, 1500);
         setInterval(loadOrderBook, 2000);
+        setInterval(loadFundingInfo, 30000);
         connectLiveTradeStream();
         window.addEventListener("resize", resizeChart);
         document.addEventListener("nexus:view:change", (event) => {
@@ -104,12 +107,25 @@
         return resp.json();
     }
 
+    /** Normalize interval to the format Binance APIs expect (lowercase). */
+    function normalizeInterval(interval) {
+        return (interval || "5m").toLowerCase();
+    }
+
+    /** Convert UTC timestamp from Binance to a local timestamp for the chart. */
+    function timeToLocal(originalTimeMs) {
+        const d = new Date(originalTimeMs);
+        return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()) / 1000;
+    }
+
     function initIntervals() {
         const btns = document.querySelectorAll(".futures-shell .chart-toolbar .interval-btn");
         btns.forEach((btn) => {
             btn.addEventListener("click", () => {
-                const newInterval = btn.getAttribute("data-interval");
-                if (!newInterval || newInterval === currentInterval) return;
+                const rawInterval = btn.getAttribute("data-interval");
+                if (!rawInterval) return;
+                const newInterval = normalizeInterval(rawInterval);
+                if (newInterval === currentInterval) return;
                 
                 btns.forEach((b) => b.classList.remove("active"));
                 btn.classList.add("active");
@@ -164,11 +180,12 @@
 
     async function loadCandles() {
         try {
-            const limit = ["1d", "1w"].includes(currentInterval.toLowerCase()) ? 1000 : 500;
-            const rows = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=${currentInterval}&limit=${limit}`);
+            const interval = currentInterval;
+            const limit = ["1d", "1w"].includes(interval) ? 1000 : 500;
+            const rows = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
             const candles = Array.isArray(rows)
                 ? rows.map((r) => ({
-                    time: Math.floor(Number(r[0]) / 1000),
+                    time: timeToLocal(Number(r[0])),
                     open: Number(r[1]),
                     high: Number(r[2]),
                     low: Number(r[3]),
@@ -192,14 +209,15 @@
     let klineSocket = null;
     function connectKlineStream() {
         if (klineSocket) klineSocket.close();
-        const stream = `${SYMBOL.toLowerCase()}@kline_${currentInterval}`;
+        const interval = currentInterval;
+        const stream = `${SYMBOL.toLowerCase()}@kline_${interval}`;
         klineSocket = new WebSocket(`wss://stream.binance.com:9443/ws/${stream}`);
         klineSocket.onmessage = (event) => {
             const payload = JSON.parse(event.data || "{}");
             const k = payload.k;
             if (!k || !candleSeries) return;
             const candle = {
-                time: Math.floor(k.t / 1000),
+                time: timeToLocal(k.t),
                 open: Number(k.o),
                 high: Number(k.h),
                 low: Number(k.l),
@@ -208,9 +226,10 @@
             candleSeries.update(candle);
             updatePrice(candle.close, lastChange);
         };
+        klineSocket.onerror = (err) => {
+            console.error("Kline WebSocket error", err);
+        };
     }
-
-    // synthetic candles removed completely
 
     async function loadTicker() {
         try {
@@ -229,6 +248,76 @@
             updatePrice(last.close, lastChange);
             updateStats({ price: last.close });
         }
+    }
+
+    /**
+     * Fetch funding rate, mark price, index price from Binance Futures API.
+     * This populates the Funding/Countdown, Mark, and Index ticker stats.
+     */
+    async function loadFundingInfo() {
+        try {
+            const data = await fetchJson(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${SYMBOL}`);
+
+            // Mark price
+            const markEl = statMark();
+            if (markEl && data.markPrice) {
+                markEl.textContent = formatMoney(Number(data.markPrice));
+            }
+
+            // Index price
+            const indexEl = statIndex();
+            if (indexEl && data.indexPrice) {
+                indexEl.textContent = formatMoney(Number(data.indexPrice));
+            }
+
+            // Funding rate + countdown
+            const fundingEl = statFunding();
+            if (fundingEl) {
+                const rate = Number(data.lastFundingRate || 0);
+                const ratePercent = (rate * 100).toFixed(4);
+                const nextFundingMs = Number(data.nextFundingTime || 0);
+
+                if (nextFundingMs > 0) {
+                    startFundingCountdown(fundingEl, ratePercent, nextFundingMs);
+                } else {
+                    fundingEl.textContent = `${ratePercent}% / --`;
+                }
+            }
+        } catch (error) {
+            console.error("Failed to load funding info", error);
+        }
+    }
+
+    /**
+     * Start a live countdown timer for the next funding time.
+     */
+    function startFundingCountdown(element, ratePercent, nextFundingMs) {
+        if (fundingTimer) clearInterval(fundingTimer);
+
+        function tick() {
+            const now = Date.now();
+            const diff = nextFundingMs - now;
+
+            if (diff <= 0) {
+                element.textContent = `${ratePercent}% / 00:00:00`;
+                clearInterval(fundingTimer);
+                fundingTimer = null;
+                // Refresh funding info after countdown expires
+                setTimeout(loadFundingInfo, 2000);
+                return;
+            }
+
+            const hours = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            const hh = String(hours).padStart(2, "0");
+            const mm = String(mins).padStart(2, "0");
+            const ss = String(secs).padStart(2, "0");
+            element.textContent = `${ratePercent}% / ${hh}:${mm}:${ss}`;
+        }
+
+        tick();
+        fundingTimer = setInterval(tick, 1000);
     }
 
     async function loadOrderBook() {
@@ -281,12 +370,17 @@
             changeEl.classList.toggle("up", change >= 0);
             changeEl.classList.toggle("down", change < 0);
         }
+        // Mark & Index are updated by loadFundingInfo() with real data.
+        // Only use ticker data as fallback if funding info hasn't loaded yet.
         const mark = statMark();
-        if (mark) mark.textContent = formatMoney(data.lastPrice || data.price || 0);
+        if (mark && mark.textContent === "--") {
+            mark.textContent = formatMoney(data.lastPrice || data.price || 0);
+        }
         const index = statIndex();
-        if (index) index.textContent = formatMoney(data.lastPrice || data.price || 0);
-        const funding = statFunding();
-        if (funding) funding.textContent = "0.0000% / --";
+        if (index && index.textContent === "--") {
+            index.textContent = formatMoney(data.lastPrice || data.price || 0);
+        }
+        // Funding is handled by loadFundingInfo(), don't overwrite here
         const high = statHigh();
         if (high) high.textContent = formatMoney(data.highPrice || data.high || 0);
         const low = statLow();

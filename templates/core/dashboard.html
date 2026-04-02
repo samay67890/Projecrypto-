@@ -245,7 +245,16 @@
                                             <button class="tab" type="button">Trading Data</button>
                                             <button class="tab" type="button">Square</button>
                                         </div>
-                                        <div class="tabs-right">Time: 15m 1h 4h 1D 1W</div>
+                                        <div class="tabs-right chart-toolbar margin-chart-toolbar">
+                                            <span>Time</span>
+                                            <span class="margin-interval-btn" data-interval="1m">1m</span>
+                                            <span class="margin-interval-btn active" data-interval="5m">5m</span>
+                                            <span class="margin-interval-btn" data-interval="15m">15m</span>
+                                            <span class="margin-interval-btn" data-interval="1H">1H</span>
+                                            <span class="margin-interval-btn" data-interval="4H">4H</span>
+                                            <span class="margin-interval-btn" data-interval="1D">1D</span>
+                                            <span class="margin-interval-btn" data-interval="1W">1W</span>
+                                        </div>
                                     </div>
                                     <div class="margin-chart-wrap">
                                         <div id="marginChart" class="margin-tradingview"></div>
@@ -271,6 +280,9 @@
                                     </div>
                                 </div>
 
+                            </section>
+
+                            <aside class="margin-right">
                                 <div class="margin-trade-panel">
                                     <div class="trade-tabs">
                                         <button class="tab active" type="button">Spot</button>
@@ -279,13 +291,13 @@
                                         <button class="tab" type="button">Grid</button>
                                     </div>
                                     <div class="trade-grid">
-                                        <div class="trade-side">
+                                        <div class="trade-side" style="grid-column: span 2;">
                                             <div class="trade-mode">
                                                 <button class="pill active" type="button">Market</button>
                                                 <button class="pill" type="button">Limit</button>
                                                 <button class="pill" type="button">Stop Limit</button>
                                             </div>
-                                            <div class="trade-field">
+                                            <div class="trade-field" style="margin-top:8px;">
                                                 <label>Price</label>
                                                 <div class="field-input readonly">
                                                     <input id="marginPriceInput" type="number" value="64321.00" step="0.01">
@@ -300,13 +312,12 @@
                                                 </div>
                                             </div>
                                             <input id="marginRange" class="trade-range" type="range" min="1" max="50" value="20">
-                                            <div class="trade-actions">
+                                            <div class="trade-actions" style="margin-top:12px;">
                                                 <button id="openLongBtn" class="btn-buy" type="button">Buy BTC</button>
                                                 <button id="openShortBtn" class="btn-sell" type="button">Sell BTC</button>
                                             </div>
-                                        </div>
-                                        <div class="trade-side">
-                                            <div class="trade-meta">
+                                            
+                                            <div class="trade-meta" style="margin-top:16px;">
                                                 <span>Leverage</span>
                                                 <button class="mini-btn" id="leverageBtn" type="button">20x</button>
                                             </div>
@@ -316,9 +327,9 @@
                                                 <button type="button" class="lev-btn" data-lev="10">10x</button>
                                                 <button type="button" class="lev-btn active" data-lev="20">20x</button>
                                             </div>
-                                            <div class="trade-meta">
+                                            <div class="trade-meta" style="margin-top:8px;">
                                                 <span>Available</span>
-                                                <span><span data-balance-usdt>1000000.00</span> USDT</span>
+                                                <span><span id="marAvailUsdt">0.00</span> USDT</span>
                                             </div>
                                             <div class="margin-metrics">
                                                 <div class="metric-row">
@@ -338,19 +349,9 @@
                                                     <span id="marginEstPnl">$0.00</span>
                                                 </div>
                                             </div>
-                                            <div class="positions-wrap">
-                                                <div class="position-head">
-                                                    <strong>Margin Positions</strong>
-                                                    <button id="closeAllBtn" class="outline-btn" type="button">Close All</button>
-                                                </div>
-                                                <div id="positionsList" class="positions-list"></div>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </section>
-
-                            <aside class="margin-right">
                                 <div class="margin-panel-head">
                                     <span>Market Explorer</span>
                                 </div>

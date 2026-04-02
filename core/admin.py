@@ -54,6 +54,18 @@ def get_trade_model():
     return get_model_by_name("Trade")
 
 
+def get_wallet_asset_model():
+    return get_model_by_name("WalletAsset")
+
+
+def get_wallet_transaction_model():
+    return get_model_by_name("WalletTransaction")
+
+
+def get_position_model():
+    return get_model_by_name("Position")
+
+
 def register_or_replace(model, admin_class):
     if not model:
         return
@@ -68,7 +80,7 @@ def get_dashboard_metrics():
     User = get_user_model()
     KYC = get_kyc_model()
     Trade = get_trade_model()
-    Transaction = get_model_by_name("Transaction")
+    Transaction = get_model_by_name("Transaction") or get_wallet_transaction_model()
     CryptoCoin = get_model_by_name("CryptoCoin")
 
     total_users = User.objects.count()
@@ -500,7 +512,7 @@ class TransactionAdmin(admin.ModelAdmin):
     def get_search_fields(self, request):
         model = self.model
         fields = []
-        transaction_field = first_field(model, ["transaction_id", "reference_id"])
+        transaction_field = first_field(model, ["transaction_id", "reference_id", "reference"])
         if transaction_field:
             fields.append(transaction_field)
         if has_field(model, "user"):
@@ -513,6 +525,8 @@ class TradeAdmin(admin.ModelAdmin):
         "trade_id_col",
         "user_col",
         "coin_col",
+        "market_type_col",
+        "event_type_col",
         "price_col",
         "amount_col",
         "total_value_col",
@@ -532,6 +546,14 @@ class TradeAdmin(admin.ModelAdmin):
     @admin.display(description="Coin")
     def coin_col(self, obj):
         return safe_value(obj, "coin")
+
+    @admin.display(description="Market")
+    def market_type_col(self, obj):
+        return safe_value(obj, "market_type")
+
+    @admin.display(description="Event")
+    def event_type_col(self, obj):
+        return safe_value(obj, "event_type")
 
     @admin.display(description="Price")
     def price_col(self, obj):
@@ -564,10 +586,67 @@ class TradeAdmin(admin.ModelAdmin):
             filters.append("coin")
         if has_field(model, "user"):
             filters.append("user")
+        for field in ("market_type", "event_type", "side"):
+            if has_field(model, field):
+                filters.append(field)
         date_field = first_field(model, ["timestamp", "created_at", "date"])
         if date_field:
             filters.append(date_field)
         return tuple(filters)
+
+
+class WalletAssetAdmin(admin.ModelAdmin):
+    list_display = ("wallet_col", "symbol_col", "balance_col", "updated_at_col")
+    ordering = ("symbol",)
+
+    @admin.display(description="Wallet")
+    def wallet_col(self, obj):
+        return safe_value(obj, "wallet")
+
+    @admin.display(description="Symbol")
+    def symbol_col(self, obj):
+        return safe_value(obj, "symbol")
+
+    @admin.display(description="Balance")
+    def balance_col(self, obj):
+        return safe_value(obj, "balance", default=Decimal("0"))
+
+    @admin.display(description="Updated At")
+    def updated_at_col(self, obj):
+        return safe_value(obj, "updated_at")
+
+
+class PositionAdmin(admin.ModelAdmin):
+    list_display = ("position_id_col", "user_col", "symbol_col", "market_type_col", "side_col", "status_col", "opened_at_col")
+    ordering = ("-id",)
+
+    @admin.display(description="Position ID")
+    def position_id_col(self, obj):
+        return safe_value(obj, "position_id")
+
+    @admin.display(description="User")
+    def user_col(self, obj):
+        return safe_value(obj, "user")
+
+    @admin.display(description="Symbol")
+    def symbol_col(self, obj):
+        return safe_value(obj, "symbol")
+
+    @admin.display(description="Market")
+    def market_type_col(self, obj):
+        return safe_value(obj, "market_type")
+
+    @admin.display(description="Side")
+    def side_col(self, obj):
+        return safe_value(obj, "side")
+
+    @admin.display(description="Status")
+    def status_col(self, obj):
+        return safe_value(obj, "status")
+
+    @admin.display(description="Opened At")
+    def opened_at_col(self, obj):
+        return safe_value(obj, "opened_at")
 
 
 class CryptoCoinAdmin(admin.ModelAdmin):
@@ -722,8 +801,10 @@ register_or_replace(User, UserControlAdmin)
 register_or_replace(get_model_by_name("OTP"), OTPAdmin)
 register_or_replace(get_kyc_model(), KYCAdmin)
 register_or_replace(get_wallet_model(), WalletAdmin)
-register_or_replace(get_model_by_name("Transaction"), TransactionAdmin)
+register_or_replace(get_model_by_name("Transaction") or get_wallet_transaction_model(), TransactionAdmin)
 register_or_replace(get_trade_model(), TradeAdmin)
+register_or_replace(get_wallet_asset_model(), WalletAssetAdmin)
+register_or_replace(get_position_model(), PositionAdmin)
 register_or_replace(get_model_by_name("CryptoCoin"), CryptoCoinAdmin)
 register_or_replace(get_model_by_name("SecurityLog"), SecurityLogAdmin)
 register_or_replace(get_model_by_name("PlatformSettings"), PlatformSettingsAdmin)

@@ -2,7 +2,9 @@ import random
 import logging
 import traceback
 from datetime import timedelta
+from decimal import Decimal
 
+from django.core.exceptions import PermissionDenied
 from django.contrib.auth import authenticate, get_user_model, login as auth_login, logout as auth_logout
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
@@ -12,12 +14,77 @@ import requests
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views import View
+from django.db import transaction
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 
 from accounts.models import OTP
+from accounts.models import Position, Wallet, WalletTransaction, Trade
+from core.serializers import (
+    PortfolioSummarySerializer,
+    PositionSerializer,
+    TradeSerializer,
+    WalletSerializer,
+    WalletTransactionSerializer,
+)
 from core.email_service import send_otp_email
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def _normalize_asset_symbol(value: str | None) -> str:
+    symbol = (value or 'USDT').upper().strip()
+    if symbol.endswith('USDT') and len(symbol) > 4:
+        return symbol[:-4]
+    return symbol
+
+
+def _ensure_wallet(user):
+    wallet, _ = Wallet.objects.get_or_create(user=user)
+    if not wallet.wallet_address:
+        wallet.save()
+    return wallet
+
+
+def _wallet_transaction_to_history_row(tx: WalletTransaction):
+    amount_text = f"+{tx.amount}" if tx.tx_type == 'deposit' else f"-{tx.amount}"
+    return {
+        "kind": "wallet_transaction",
+        "time": tx.created_at.isoformat() if tx.created_at else None,
+        "transaction": {
+            "time": tx.created_at.isoformat() if tx.created_at else None,
+            "asset": tx.asset,
+            "type": tx.get_tx_type_display(),
+            "amount": amount_text,
+            "status": tx.status.capitalize(),
+            "details": tx.details or f"{tx.get_tx_type_display()} {tx.asset}",
+        },
+    }
+
+
+def _create_trade_id():
+    import uuid
+
+    trade_id = str(uuid.uuid4())[:8]
+    while Trade.objects.filter(trade_id=trade_id).exists():
+        trade_id = str(uuid.uuid4())[:8]
+    return trade_id
+
+
+def _record_trade(*, user, coin, side, price, amount, total_value, market_type, event_type, profit_loss=Decimal("0")):
+    return Trade.objects.create(
+        user=user,
+        trade_id=_create_trade_id(),
+        coin=coin,
+        side=side,
+        price=price,
+        amount=amount,
+        total_value=total_value,
+        profit_loss=profit_loss,
+        market_type=market_type,
+        event_type=event_type,
+    )
 
 
 def debug_health(request):
@@ -243,17 +310,25 @@ class SigninView(View):
                 'error': 'Please enter both email and password.',
             })
 
-        # Resolve user with case-insensitive lookup so mixed-case stored emails can still sign in.
-        candidate = User.objects.filter(email__iexact=email).first() or User.objects.filter(username__iexact=email).first()
-        login_identifier = candidate.email if candidate else email
+        # django-axes: attempt authentication — may raise AxesLockedOut
+        try:
+            # Resolve user with case-insensitive lookup so mixed-case stored emails can still sign in.
+            candidate = User.objects.filter(email__iexact=email).first() or User.objects.filter(username__iexact=email).first()
+            login_identifier = candidate.email if candidate else email
 
-        user = authenticate(request, email=login_identifier, password=password)
-        if not user:
-            # Temporary fallback to support projects/users that still authenticate with username.
-            user = authenticate(request, username=login_identifier, password=password)
-        if not user and candidate and candidate.check_password(password):
-            # Final fallback for legacy auth edge cases.
-            user = candidate
+            user = authenticate(request, email=login_identifier, password=password)
+            if not user:
+                # Temporary fallback to support projects/users that still authenticate with username.
+                user = authenticate(request, username=login_identifier, password=password)
+            if not user and candidate and candidate.check_password(password):
+                # Final fallback for legacy auth edge cases.
+                user = candidate
+        except PermissionDenied:
+            return render(request, 'core/signin.html', {
+                'email': email,
+                'error': 'Too many failed login attempts. Your account is temporarily locked. Please try again after 30 minutes.',
+            })
+
         if not user:
             return render(request, 'core/signin.html', {
                 'email': email,
@@ -269,6 +344,8 @@ class SigninView(View):
         if not hasattr(user, 'backend'):
             user.backend = 'django.contrib.auth.backends.ModelBackend'
         auth_login(request, user)
+        # Ensure wallet always exists for authenticated users.
+        _ensure_wallet(user)
         return redirect('dashboard')
 
 
@@ -309,6 +386,14 @@ class SignupVerifyOtpView(View):
                 'error': 'Please enter a valid 6-digit code.',
             })
 
+        # OTP rate limiting — max 5 wrong attempts per signup session
+        otp_attempts = request.session.get('otp_attempts', 0)
+        if otp_attempts >= 5:
+            return render(request, 'core/signup/verify_otp.html', {
+                'email': email,
+                'error': 'Too many failed OTP attempts. Please request a new code.',
+            })
+
         # Verify OTP using email (not user, since user doesn't exist yet)
         now = timezone.now()
         otp_record = (
@@ -318,9 +403,11 @@ class SignupVerifyOtpView(View):
         )
         
         if not otp_record or not check_password(otp_value, otp_record.otp_hash):
+            request.session['otp_attempts'] = otp_attempts + 1
+            remaining = 5 - (otp_attempts + 1)
             return render(request, 'core/signup/verify_otp.html', {
                 'email': email,
-                'error': 'Invalid or expired code. Please try again or resend.',
+                'error': f'Invalid or expired code. {remaining} attempt(s) remaining.',
             })
 
         # OTP verified! Now create the user account
@@ -330,6 +417,8 @@ class SignupVerifyOtpView(View):
             password=plain_password,
             username=email,
         )
+        # Auto-create wallet on signup so DB has row immediately.
+        _ensure_wallet(user)
         
         # Link OTP to user
         otp_record.user = user
@@ -366,6 +455,9 @@ class SignupResendOtpView(View):
         
         # Generate new OTP for email and send email
         code = _create_otp_for_email(email)
+        
+        # Reset OTP attempt counter on resend
+        request.session['otp_attempts'] = 0
         
         # Send OTP email
         send_otp_email(email, code)
@@ -672,14 +764,455 @@ def orderbook(request):
             return JsonResponse({"asks": [], "bids": []}, status=502)
 
 
+def wallet_data(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to access wallet data."}, status=401)
+
+    wallet = _ensure_wallet(request.user)
+    serializer = WalletSerializer(wallet=wallet, user=request.user)
+    return JsonResponse(serializer.data)
+
+
+def portfolio_summary(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to access portfolio data."}, status=401)
+
+    wallet = _ensure_wallet(request.user)
+    user_trades = Trade.objects.filter(user=request.user)
+    trade_count = user_trades.count()
+    total_volume = user_trades.aggregate(volume=Coalesce(Sum("total_value"), Decimal("0")))["volume"]
+    serializer = PortfolioSummarySerializer(wallet=wallet, trade_count=trade_count, total_volume=total_volume)
+    return JsonResponse(serializer.data)
+
+
+def transactions_data(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to access transaction data."}, status=401)
+
+    limit_raw = request.GET.get("limit", "100")
+    try:
+        limit = max(1, min(500, int(limit_raw)))
+    except ValueError:
+        return JsonResponse({"error": "invalid_limit"}, status=400)
+
+    trades_qs = list(
+        Trade.objects
+        .select_related("user")
+        .filter(user=request.user)
+        .order_by("-timestamp")[:limit]
+    )
+    wallet_txs_qs = list(
+        WalletTransaction.objects
+        .filter(user=request.user)
+        .order_by("-created_at")[:limit]
+    )
+    merged = []
+    for trade in trades_qs:
+        item = TradeSerializer(trade).data
+        item["_sort_key"] = trade.timestamp
+        merged.append(item)
+    for tx in wallet_txs_qs:
+        item = WalletTransactionSerializer(tx).data
+        item["history_rows"] = _wallet_transaction_to_history_row(tx)
+        item["_sort_key"] = tx.created_at
+        merged.append(item)
+    merged.sort(key=lambda item: item.get("_sort_key") or timezone.now(), reverse=True)
+    results = [{k: v for k, v in item.items() if k != "_sort_key"} for item in merged[:limit]]
+    return JsonResponse({"results": results, "count": len(results)})
+
+
+def positions_data(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to access positions."}, status=401)
+
+    positions = Position.objects.filter(user=request.user, status='open').order_by('-opened_at')
+    margin = [PositionSerializer(pos).data for pos in positions if pos.market_type == 'margin']
+    futures = [PositionSerializer(pos).data for pos in positions if pos.market_type == 'futures']
+    return JsonResponse({"margin": margin, "futures": futures})
+
+
+def deposit_simulate(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to deposit."}, status=401)
+
+    try:
+        import json
+
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        amount = Decimal(str(payload.get("amount", 0)))
+        asset = _normalize_asset_symbol(payload.get("asset"))
+        method = str(payload.get("method", "")).strip()[:120]
+        if amount <= 0:
+            return JsonResponse({"error": "invalid_amount"}, status=400)
+
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+            if not wallet.wallet_address:
+                wallet.save()
+            current_balance = wallet.get_asset_balance(asset)
+            wallet.set_asset_balance(asset, current_balance + amount)
+            wallet.total_deposits += amount
+            wallet.save(update_fields=["total_deposits"])
+
+            tx = WalletTransaction.objects.create(
+                wallet=wallet,
+                user=request.user,
+                tx_type="deposit",
+                asset=asset,
+                amount=amount,
+                method=method,
+                details=f"{method or asset} deposit credited to {asset} wallet",
+            )
+
+        return JsonResponse({
+            "status": "ok",
+            "wallet": WalletSerializer(wallet=wallet, user=request.user).data,
+            "transaction": WalletTransactionSerializer(tx).data,
+            "history_rows": _wallet_transaction_to_history_row(tx),
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+def margin_order(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to trade margin."}, status=401)
+
+    try:
+        import json
+
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        side = str(payload.get("side", "")).lower().strip()
+        symbol = str(payload.get("symbol", "BTCUSDT")).upper().strip() or "BTCUSDT"
+        price = Decimal(str(payload.get("price", 0)))
+        size = Decimal(str(payload.get("size", 0)))
+        leverage = Decimal(str(payload.get("leverage", 1)))
+        if side not in {"long", "short"}:
+            return JsonResponse({"error": "invalid_side"}, status=400)
+        if price <= 0 or size <= 0 or leverage <= 0:
+            return JsonResponse({"error": "invalid_parameters"}, status=400)
+
+        margin_required = (price * size) / leverage
+
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+            if wallet.balance < margin_required:
+                return JsonResponse(
+                    {"error": "insufficient_balance", "required": float(margin_required), "available": float(wallet.balance)},
+                    status=400,
+                )
+            wallet.balance -= margin_required
+            wallet.save(update_fields=["balance"])
+
+            position = Position.objects.create(
+                user=request.user,
+                wallet=wallet,
+                symbol=symbol,
+                market_type="margin",
+                side=side,
+                amount=size,
+                entry_price=price,
+                leverage=leverage,
+                margin=margin_required,
+            )
+            trade = _record_trade(
+                user=request.user,
+                coin=symbol,
+                side=side.capitalize(),
+                price=price,
+                amount=size,
+                total_value=margin_required,
+                market_type="margin",
+                event_type="margin_open",
+            )
+
+        return JsonResponse({
+            "status": "ok",
+            "trade": TradeSerializer(trade).data,
+            "position": PositionSerializer(position).data,
+            "new_usdt": float(wallet.balance),
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+def margin_close_all(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to close margin positions."}, status=401)
+
+    try:
+        import json
+
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        symbol = str(payload.get("symbol", "BTCUSDT")).upper().strip() or "BTCUSDT"
+        close_price = Decimal(str(payload.get("close_price", 0)))
+        if close_price <= 0:
+            return JsonResponse({"error": "invalid_close_price"}, status=400)
+
+        total_released = Decimal("0")
+        closed_count = 0
+        now = timezone.now()
+
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+            positions = list(Position.objects.select_for_update().filter(
+                user=request.user,
+                market_type='margin',
+                status='open',
+                symbol=symbol,
+            ))
+            for position in positions:
+                pnl = (close_price - position.entry_price) * position.amount if position.side == 'long' else (position.entry_price - close_price) * position.amount
+                released = position.margin + pnl
+                total_released += released
+                position.status = 'closed'
+                position.close_price = close_price
+                position.realized_pnl = pnl
+                position.closed_at = now
+                position.save(update_fields=['status', 'close_price', 'realized_pnl', 'closed_at'])
+                _record_trade(
+                    user=request.user,
+                    coin=position.symbol,
+                    side='Close',
+                    price=close_price,
+                    amount=position.amount,
+                    total_value=released,
+                    profit_loss=pnl,
+                    market_type='margin',
+                    event_type='margin_close',
+                )
+                closed_count += 1
+
+            wallet.balance += total_released
+            wallet.save(update_fields=['balance'])
+
+        return JsonResponse({
+            "status": "ok",
+            "closed_count": closed_count,
+            "released_total": float(total_released),
+            "new_usdt": float(wallet.balance),
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
 def order(request):
     if request.method != "POST":
         return JsonResponse({"error": "method_not_allowed"}, status=405)
+    
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to trade."}, status=401)
+
     try:
-        payload = _jsonlib.loads(request.body.decode("utf-8") or "{}")
-        side = payload.get("side")
-        price = payload.get("price")
-        size = payload.get("size")
-        return JsonResponse({"status": "ok", "side": side, "price": price, "size": size})
-    except Exception:
-        return JsonResponse({"error": "bad_request"}, status=400)
+        import json
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        side = payload.get("side", "").lower()
+        symbol = str(payload.get("symbol", "BTCUSDT")).upper().strip() or "BTCUSDT"
+        asset_symbol = _normalize_asset_symbol(symbol)
+        price = Decimal(str(payload.get("price", 0)))
+        size = Decimal(str(payload.get("size", 0)))
+        
+        if size <= 0 or price <= 0:
+            return JsonResponse({"error": "invalid_parameters"}, status=400)
+            
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+            total_value = price * size
+
+            if side == "buy":
+                if wallet.balance < total_value:
+                    return JsonResponse({"error": "insufficient_balance", "required": float(total_value), "available": float(wallet.balance)}, status=400)
+
+                wallet.balance -= total_value
+                wallet.save(update_fields=["balance"])
+                current_asset = wallet.get_asset_balance(asset_symbol)
+                wallet.set_asset_balance(asset_symbol, current_asset + size)
+
+            elif side == "sell":
+                current_asset = wallet.get_asset_balance(asset_symbol)
+                if current_asset < size:
+                    return JsonResponse({"error": "insufficient_crypto", "required": float(size), "available": float(current_asset)}, status=400)
+
+                wallet.set_asset_balance(asset_symbol, current_asset - size)
+                wallet.balance += total_value
+                wallet.save(update_fields=["balance"])
+            else:
+                return JsonResponse({"error": "invalid_side"}, status=400)
+
+            import uuid
+            trade_id = str(uuid.uuid4())[:8]
+            while Trade.objects.filter(trade_id=trade_id).exists():
+                trade_id = str(uuid.uuid4())[:8]
+
+            trade = Trade.objects.create(
+                user=request.user,
+                trade_id=trade_id,
+                coin=symbol,
+                side=side.capitalize(),
+                price=price,
+                amount=size,
+                total_value=total_value,
+                market_type="spot",
+                event_type="spot_fill",
+            )
+
+        return JsonResponse({
+            "status": "ok",
+            "side": side,
+            "price": float(price),
+            "size": float(size),
+            "trade_id": trade.trade_id,
+            "user_id": request.user.id,
+            "user_email": request.user.email,
+            "trade": TradeSerializer(trade).data,
+            "new_usdt": float(wallet.balance),
+            "asset_symbol": asset_symbol,
+            "new_asset_balance": float(wallet.get_asset_balance(asset_symbol)),
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+def futures_order(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to trade futures."}, status=401)
+
+    try:
+        import json
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        side = str(payload.get("side", "")).lower().strip()
+        symbol = str(payload.get("symbol", "BTCUSDT")).upper().strip() or "BTCUSDT"
+        price = Decimal(str(payload.get("price", 0)))
+        size = Decimal(str(payload.get("size", 0)))
+        leverage = Decimal(str(payload.get("leverage", 1)))
+
+        if side not in {"long", "short"}:
+            return JsonResponse({"error": "invalid_side"}, status=400)
+        if price <= 0 or size <= 0 or leverage <= 0:
+            return JsonResponse({"error": "invalid_parameters"}, status=400)
+
+        margin_required = (price * size) / leverage
+
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+            if wallet.balance < margin_required:
+                return JsonResponse(
+                    {
+                        "error": "insufficient_balance",
+                        "required": float(margin_required),
+                        "available": float(wallet.balance),
+                    },
+                    status=400,
+                )
+
+            wallet.balance -= margin_required
+            wallet.save(update_fields=["balance"])
+
+            position = Position.objects.create(
+                user=request.user,
+                wallet=wallet,
+                symbol=symbol,
+                market_type="futures",
+                side=side,
+                amount=size,
+                entry_price=price,
+                leverage=leverage,
+                margin=margin_required,
+                take_profit=Decimal(str(payload.get("tp", 0))) if Decimal(str(payload.get("tp", 0))) > 0 else None,
+                stop_loss=Decimal(str(payload.get("sl", 0))) if Decimal(str(payload.get("sl", 0))) > 0 else None,
+            )
+            trade = _record_trade(
+                user=request.user,
+                coin=symbol,
+                side=side.capitalize(),
+                price=price,
+                amount=size,
+                total_value=margin_required,
+                market_type="futures",
+                event_type="futures_open",
+            )
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "trade": TradeSerializer(trade).data,
+                "position": PositionSerializer(position).data,
+                "new_usdt": float(wallet.balance),
+                "locked_margin": float(margin_required),
+                "user_id": request.user.id,
+                "user_email": request.user.email,
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+def futures_close_all(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to close futures positions."}, status=401)
+
+    try:
+        import json
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+        symbol = str(payload.get("symbol", "BTCUSDT")).upper().strip() or "BTCUSDT"
+        close_price = Decimal(str(payload.get("close_price", 0)))
+        if close_price <= 0:
+            return JsonResponse({"error": "invalid_close_price"}, status=400)
+
+        total_released = Decimal("0")
+        closed_count = 0
+        now = timezone.now()
+
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+            positions = list(Position.objects.select_for_update().filter(
+                user=request.user,
+                market_type='futures',
+                status='open',
+                symbol=symbol,
+            ))
+            for position in positions:
+                pnl = (close_price - position.entry_price) * position.amount if position.side == "long" else (position.entry_price - close_price) * position.amount
+                released = position.margin + pnl
+                total_released += released
+                position.status = 'closed'
+                position.close_price = close_price
+                position.realized_pnl = pnl
+                position.closed_at = now
+                position.save(update_fields=['status', 'close_price', 'realized_pnl', 'closed_at'])
+
+                _record_trade(
+                    user=request.user,
+                    coin=symbol,
+                    side="Close",
+                    price=close_price,
+                    amount=position.amount,
+                    total_value=released,
+                    profit_loss=pnl,
+                    market_type="futures",
+                    event_type="futures_close",
+                )
+                closed_count += 1
+
+            wallet.balance += total_released
+            wallet.save(update_fields=["balance"])
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "closed_count": closed_count,
+                "released_total": float(total_released),
+                "new_usdt": float(wallet.balance),
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)

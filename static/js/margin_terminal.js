@@ -1,5 +1,6 @@
 (function () {
     const containerId = "marginChart";
+    const BINANCE_API_BASE = "https://api.binance.com/api/v3";
     const candles = [];
     const maxCandles = 200;
     let chart;
@@ -15,10 +16,27 @@
     let pendingPrice = null;
     let libLoading = false;
     let klineSocket = null;
-    let currentInterval = "1m";
+    let currentInterval = "5m"; // Default from UI
     let statusEl = null;
     let chartReady = false;
     let lastLiveUpdate = 0;
+    let tickerTimer = null;
+    let orderBookTimer = null;
+
+    /** Convert UTC timestamp from Binance to a local timestamp for the chart. */
+    function timeToLocal(originalTimeMs) {
+        const d = new Date(originalTimeMs);
+        return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()) / 1000;
+    }
+
+    /** Normalize interval to the format Binance APIs expect (lowercase). */
+    function normalizeInterval(interval) {
+        return (interval || "5m").toLowerCase();
+    }
+    
+    function formatMoney(value) {
+        return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+    }
 
     function init() {
         const container = document.getElementById(containerId);
@@ -32,7 +50,7 @@
             return;
         }
         chart = window.LightweightCharts.createChart(container, {
-            layout: { background: { color: "#080b10" }, textColor: "#6b7785", attributionLogo: false },
+            layout: { background: { color: "transparent" }, textColor: "#6b7785", attributionLogo: false },
             grid: { vertLines: { color: "rgba(255,255,255,0.018)" }, horzLines: { color: "rgba(255,255,255,0.018)" } },
             timeScale: { borderColor: "rgba(255,255,255,0.04)", timeVisible: true, secondsVisible: false },
             rightPriceScale: { borderColor: "rgba(255,255,255,0.04)" },
@@ -52,14 +70,6 @@
             wickUpColor: "rgba(14, 203, 129, 0.6)",
             wickDownColor: "rgba(246, 70, 93, 0.6)",
         });
-
-        // Volume bars disabled for cleaner chart
-        // volumeSeries = chart.addSeries(LightweightCharts.HistogramSeries, {
-        //     color: "rgba(14, 203, 129, 0.08)",
-        //     priceFormat: { type: "volume" },
-        //     priceScaleId: "",
-        //     scaleMargins: { top: 0.88, bottom: 0 },
-        // });
 
         ma7Series = chart.addSeries(LightweightCharts.LineSeries, { color: "rgba(240, 185, 11, 0.6)", lineWidth: 1, crosshairMarkerVisible: false, lastValueVisible: false, priceLineVisible: false });
         ma25Series = chart.addSeries(LightweightCharts.LineSeries, { color: "rgba(240, 98, 146, 0.5)", lineWidth: 1, crosshairMarkerVisible: false, lastValueVisible: false, priceLineVisible: false });
@@ -81,11 +91,35 @@
         }
         resize();
 
+        initIntervals();
+        initTradeButtons();
+
         const snapshot = window.nexusPortfolioSnapshot;
         const initial = Number(snapshot?.spot?.markPrice || 0);
         if (Number.isFinite(initial) && initial) pendingPrice = initial;
         const initialSymbol = String(snapshot?.selectedCoin?.symbol || "BTC");
         setActiveSymbol(initialSymbol);
+    }
+
+    function initIntervals() {
+        const btns = document.querySelectorAll(".margin-interval-btn");
+        btns.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const rawInterval = btn.getAttribute("data-interval");
+                if (!rawInterval) return;
+                const newInterval = normalizeInterval(rawInterval);
+                if (newInterval === currentInterval) return;
+                
+                btns.forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+                currentInterval = newInterval;
+                if (activeSymbol) {
+                    setStatus("Loading Binance candles...", true);
+                    fetchHistoricalCandles(activeSymbol, currentInterval);
+                    connectKlineStream(activeSymbol, currentInterval);
+                }
+            });
+        });
     }
 
     function scheduleInit() {
@@ -141,13 +175,14 @@
         el.style.left = "12px";
         el.style.top = "12px";
         el.style.padding = "6px 8px";
-        el.style.background = "rgba(24,26,32,0.85)";
-        el.style.border = "1px solid #20252c";
+        el.style.background = "rgba(14,16,22,0.85)";
+        el.style.border = "1px solid rgba(255,255,255,0.06)";
         el.style.borderRadius = "8px";
         el.style.fontSize = "11px";
         el.style.color = "#fff";
         el.style.pointerEvents = "none";
         el.style.display = "none";
+        el.style.backdropFilter = "blur(10px)";
         container.appendChild(el);
         return el;
     }
@@ -242,14 +277,108 @@
         el.textContent = `MA(${period}): ${avg.toFixed(2)}`;
     }
 
+    async function fetchJson(url) {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error("fetch failed");
+        return resp.json();
+    }
+
+    async function loadTicker(symbol) {
+        if (!symbol) return;
+        try {
+            const data = await fetchJson(`${BINANCE_API_BASE}/ticker/24hr?symbol=${symbol}USDT`);
+            const price = Number(data.lastPrice);
+            if (Number.isFinite(price)) {
+                const elLivePrice = document.getElementById("marginLivePrice");
+                if (elLivePrice) {
+                    const change = Number(data.priceChangePercent || 0);
+                    const sign = change >= 0 ? "+" : "";
+                    const color = change >= 0 ? "#0ecb81" : "#f6465d";
+                    elLivePrice.innerHTML = `<span style="color:${color};">$${formatMoney(price)} (${sign}${change.toFixed(2)}%)</span>`;
+                }
+                const elMidPrice = document.getElementById("marginMidPrice");
+                if (elMidPrice && elMidPrice.textContent === "64,321.00") {
+                    elMidPrice.textContent = formatMoney(price);
+                    elMidPrice.style.color = Number(data.priceChangePercent) >= 0 ? "#0ecb81" : "#f6465d";
+                }
+            }
+        } catch (error) {
+            console.warn("Margin ticker fetch failed");
+        }
+    }
+
+    async function loadOrderBook(symbol) {
+        if (!symbol) return;
+        try {
+            const data = await fetchJson(`${BINANCE_API_BASE}/depth?symbol=${symbol}USDT&limit=15`);
+            renderOrderRows(document.getElementById("marginOrderAsks"), data.asks || [], "ask");
+            renderOrderRows(document.getElementById("marginOrderBids"), data.bids || [], "bid");
+        } catch (error) {
+            console.warn("Margin order book fetch failed");
+        }
+    }
+
+    function renderOrderRows(container, rows, type) {
+        if (!container) return;
+        let sum = 0;
+        const mapped = rows.slice(0, 15).map((row) => {
+            const price = Number(row[0]);
+            const size = Number(row[1]);
+            sum += size;
+            const depth = Math.min(100, (sum / 15) * 100);
+            return `<div class="margin-ob-row ${type}" style="--depth: ${depth}%;">
+                <span>${formatMoney(price)}</span>
+                <span>${size.toFixed(4)}</span>
+                <span>${sum.toFixed(4)}</span>
+            </div>`;
+        });
+        
+        if (type === "ask") mapped.reverse();
+        
+        const newHtml = mapped.join("");
+        if (container.innerHTML !== newHtml) {
+            container.innerHTML = newHtml;
+        }
+    }
+
+    function initTradeButtons() {
+        const buyBtn = document.getElementById("openLongBtn");
+        const sellBtn = document.getElementById("openShortBtn");
+        
+        if (buyBtn) {
+            buyBtn.addEventListener("click", () => {
+                alert("Wallet Logic: This connects to your NexusCrypto SQLite/PostgreSQL database via the Django Backend. The user's USDT balance is verified on the server before placing a real Trade order.");
+            });
+        }
+        if (sellBtn) {
+            sellBtn.addEventListener("click", () => {
+                alert("Wallet Logic: Active balance mapping is handled in core/views.py. A POST request would be sent here to deduct margin leverage and open a position.");
+            });
+        }
+    }
+
     async function setActiveSymbol(symbol) {
         const next = String(symbol || "BTC").toUpperCase();
         if (activeSymbol === next) return;
         activeSymbol = next;
+        
+        const label = document.getElementById("marginPairLabel");
+        if (label) label.textContent = `${activeSymbol}USDT`;
+        
         resetSeries();
         setStatus("Loading Binance candles...", true);
+        
         const ok = await fetchHistoricalCandles(next, currentInterval);
         connectKlineStream(next, currentInterval);
+        
+        loadTicker(next);
+        loadOrderBook(next);
+
+        if (tickerTimer) clearInterval(tickerTimer);
+        if (orderBookTimer) clearInterval(orderBookTimer);
+        tickerTimer = setInterval(() => loadTicker(activeSymbol), 2000);
+        orderBookTimer = setInterval(() => loadOrderBook(activeSymbol), 2500);
+
         if (!ok) setStatus("Binance candles unavailable for this pair.", true);
     }
 
@@ -259,7 +388,6 @@
         lastCandleTime = 0;
         if (candleSeries) {
             candleSeries.setData([]);
-            volumeSeries.setData([]);
             ma7Series.setData([]);
             ma25Series.setData([]);
             ma99Series.setData([]);
@@ -269,14 +397,14 @@
     async function fetchHistoricalCandles(symbol, interval, attempt = 0) {
         if (!symbol) return false;
         try {
-            const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=${interval}&limit=${maxCandles}`);
+            const response = await fetch(`${BINANCE_API_BASE}/klines?symbol=${symbol}USDT&interval=${interval}&limit=${maxCandles}`);
             if (!response.ok) throw new Error("kline fetch failed");
             const data = await response.json();
             if (!Array.isArray(data) || !data.length) throw new Error("no kline data");
             candles.length = 0;
             data.forEach((k) => {
                 candles.push({
-                    time: Math.floor(k[0] / 1000),
+                    time: timeToLocal(Number(k[0])),
                     open: Number(k[1]),
                     high: Number(k[2]),
                     low: Number(k[3]),
@@ -285,7 +413,6 @@
             });
             if (candleSeries) candleSeries.setData(candles);
             lastCandle = candles[candles.length - 1] || null;
-            updateVolume();
             updateMAs();
             if (chart) chart.timeScale().fitContent();
             if (Number.isFinite(pendingPrice) && pendingPrice && lastCandle) {
@@ -315,7 +442,7 @@
                 const k = payload.k;
                 if (!k) return;
                 const candle = {
-                    time: Math.floor(k.t / 1000),
+                    time: timeToLocal(Number(k.t)),
                     open: Number(k.o),
                     high: Number(k.h),
                     low: Number(k.l),
@@ -328,9 +455,14 @@
                     candles.push(candle);
                     if (candles.length > maxCandles) candles.shift();
                     candleSeries.setData(candles);
-                    updateVolume();
                     updateMAs();
                     setStatus("", false);
+                    
+                    const elMidPrice = document.getElementById("marginMidPrice");
+                    if (elMidPrice) {
+                        elMidPrice.textContent = formatMoney(candle.close);
+                        elMidPrice.style.color = candle.close >= candle.open ? "#0ecb81" : "#f6465d";
+                    }
                 } else {
                     if (now - lastLiveUpdate > 1000) {
                         candleSeries.update(candle);

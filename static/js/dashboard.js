@@ -106,9 +106,164 @@
         setStatusBadge("live", detail || "Market data live");
     }
 
+    async function syncBackendWallet() {
+        try {
+            const response = await fetch('/api/wallet/');
+            if (response.ok) {
+                const data = await response.json();
+                const assets = data?.assets && typeof data.assets === "object" ? data.assets : {};
+                Object.entries(assets).forEach(([symbol, amount]) => {
+                    setWalletBalance(symbol, amount);
+                });
+                if (!Object.keys(assets).length) {
+                    setWalletBalance("USDT", data.usdt);
+                    setWalletBalance("BTC", data.btc);
+                }
+                state.asset = getWalletBalance(selectedCoin.symbol);
+                updateUi();
+            }
+        } catch(e) {
+            console.error("Backend wallet sync failed natively, using fallback.", e);
+        }
+    }
+
+    function normalizeBackendTimestamp(value) {
+        if (!value) return stamp(new Date());
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return stamp(new Date());
+        return stamp(parsed);
+    }
+
+    function mapBackendTradeToHistoryRows(trade) {
+        const symbol = String(trade?.coin || "BTCUSDT").replace(/USDT$/, "") || "BTC";
+        const pair = `${symbol}/USDT`;
+        const rawSide = String(trade?.side || "").toLowerCase();
+        const side = rawSide === "sell" ? "Sell" : (rawSide === "short" ? "Sell" : "Buy");
+        const marketType = String(trade?.market_type || "spot").toLowerCase();
+        const eventType = String(trade?.event_type || "spot_fill").toLowerCase();
+        const priceNum = Number(trade?.price || 0);
+        const amountNum = Number(trade?.amount || 0);
+        const totalNum = Number(trade?.total_value || 0);
+        const when = normalizeBackendTimestamp(trade?.timestamp);
+        const orderType = marketType === "futures" ? "Futures" : (marketType === "margin" ? "Margin" : "Market");
+        const txType = marketType === "futures" ? "Futures" : (marketType === "margin" ? "Margin" : "Trade");
+        const isOutflow = eventType === "futures_open" || eventType === "margin_open" || side === "Buy";
+        const detailsPrefix = marketType === "futures" ? "Futures" : (marketType === "margin" ? "Margin" : "Spot");
+        return {
+            order: {
+                time: when,
+                pair,
+                type: orderType,
+                side,
+                price: fmtMoney(priceNum),
+                amount: fmtAsset(amountNum),
+                filled: "100%",
+                status: "Filled",
+            },
+            trade: {
+                time: when,
+                pair,
+                side,
+                price: fmtMoney(priceNum),
+                executed: fmtAsset(amountNum),
+                fee: `${fmtAsset(amountNum * 0.001)} ${symbol}`,
+                total: `${fmtMoney(totalNum)} USDT`,
+            },
+            transaction: {
+                time: when,
+                asset: "USDT",
+                type: txType,
+                amount: `${isOutflow ? "-" : "+"}${fmtMoney(totalNum)}`,
+                status: "Completed",
+                details: `${detailsPrefix} ${side} ${fmtAsset(amountNum)} ${symbol}`,
+            },
+        };
+    }
+
+    async function syncBackendTransactions(limit = 120) {
+        try {
+            const response = await fetch(`/api/transactions/?limit=${Math.max(1, Number(limit) || 120)}`);
+            if (!response.ok) return;
+            const payload = await response.json();
+            const rows = Array.isArray(payload?.results) ? payload.results : [];
+            const orders = [];
+            const trades = [];
+            const transactions = [];
+            rows.forEach((row) => {
+                if (row?.kind === "wallet_transaction" && row?.history_rows?.transaction) {
+                    transactions.push({
+                        ...row.history_rows.transaction,
+                        time: normalizeBackendTimestamp(row.history_rows.transaction.time),
+                    });
+                    return;
+                }
+                const mapped = mapBackendTradeToHistoryRows(row);
+                orders.push(mapped.order);
+                trades.push(mapped.trade);
+                transactions.push(mapped.transaction);
+            });
+            state.history.orders = orders;
+            state.history.trades = trades;
+            state.history.transactions = transactions;
+            saveState();
+            renderCurrentHistoryTab();
+        } catch (error) {
+            console.error("Backend transaction sync failed.", error);
+        }
+    }
+
+    async function syncBackendPortfolioSummary() {
+        try {
+            const response = await fetch("/api/portfolio/");
+            if (!response.ok) return;
+            const data = await response.json();
+            if (Number.isFinite(Number(data?.equity))) {
+                openingEquity = Number(data.equity);
+            }
+        } catch (error) {
+            console.error("Backend portfolio sync failed.", error);
+        }
+    }
+
+    function mapBackendPosition(position) {
+        return {
+            id: position.position_id,
+            side: String(position.side || "").toLowerCase(),
+            amount: Number(position.amount || 0),
+            entry: Number(position.entry_price || 0),
+            leverage: Number(position.leverage || 1),
+            margin: Number(position.margin || 0),
+            tp: position.take_profit != null ? Number(position.take_profit) : null,
+            sl: position.stop_loss != null ? Number(position.stop_loss) : null,
+            symbol: String(position.symbol || selectedCoin.marketSymbol || "BTCUSDT"),
+        };
+    }
+
+    async function syncBackendPositions() {
+        try {
+            const response = await fetch("/api/positions/");
+            if (!response.ok) return;
+            const data = await response.json();
+            state.positions = Array.isArray(data?.margin) ? data.margin.map(mapBackendPosition) : [];
+            state.futuresPositions = Array.isArray(data?.futures) ? data.futures.map(mapBackendPosition) : [];
+            saveState();
+            updateUi();
+        } catch (error) {
+            console.error("Backend positions sync failed.", error);
+        }
+    }
+
     async function initDataProvider() {
         dataProvider = await detectProvider();
         window.nexusDataProvider = dataProvider;
+        
+        await Promise.all([
+            syncBackendWallet(),
+            syncBackendPositions(),
+            syncBackendTransactions(),
+            syncBackendPortfolioSummary(),
+        ]);
+        
         await seedCoinUniverse();
         window.nexusCoinUniverse = [...coinUniverse];
         if (coinUniverse.length) {
@@ -598,7 +753,22 @@
         if (sellBtn) sellBtn.addEventListener("click", () => executeSpotTrade("sell"));
     }
 
-    function executeSpotTrade(side) {
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    async function executeSpotTrade(side) {
         const amountInput = qs("spotAmountInput");
         const priceInput = qs("spotPriceInput");
         if (!amountInput || !priceInput) return;
@@ -607,48 +777,77 @@
         if (!amount || amount <= 0 || !price) return;
 
         const total = amount * price;
-        const usdtBalance = getWalletBalance("USDT");
-        const coinBalance = getWalletBalance(selectedCoin.symbol);
-        if (side === "buy") {
-            if (usdtBalance < total) return alert("Insufficient USDT balance.");
-            setWalletBalance("USDT", usdtBalance - total);
-            setWalletBalance(selectedCoin.symbol, coinBalance + amount);
-        } else {
-            if (coinBalance < amount) return alert(`Insufficient ${selectedCoin.symbol} balance.`);
-            setWalletBalance(selectedCoin.symbol, coinBalance - amount);
-            setWalletBalance("USDT", usdtBalance + total);
+
+        try {
+            const response = await fetch('/api/order/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    side,
+                    price,
+                    size: amount,
+                    symbol: `${selectedCoin.symbol}USDT`,
+                })
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert(data.message || data.error || "Trade failed");
+                return;
+            }
+
+            // Backend success! Update local simulation balances so UI refreshes without heavy reloads
+            setWalletBalance("USDT", data.new_usdt);
+            setWalletBalance(data.asset_symbol || selectedCoin.symbol, data.new_asset_balance);
+
+            const backendTrade = data?.trade;
+            if (backendTrade) {
+                const mapped = mapBackendTradeToHistoryRows(backendTrade);
+                pushHistory("orders", mapped.order);
+                pushHistory("trades", mapped.trade);
+                pushHistory("transactions", mapped.transaction);
+            } else {
+                pushHistory("orders", {
+                    time: stamp(new Date()),
+                    pair: `${selectedCoin.symbol}/USDT`,
+                    type: "Market",
+                    side: side === "buy" ? "Buy" : "Sell",
+                    price: fmtMoney(price),
+                    amount: fmtAsset(amount),
+                    filled: "100%",
+                    status: "Filled",
+                });
+                pushHistory("trades", {
+                    time: stamp(new Date()),
+                    pair: `${selectedCoin.symbol}/USDT`,
+                    side: side === "buy" ? "Buy" : "Sell",
+                    price: fmtMoney(price),
+                    executed: fmtAsset(amount),
+                    fee: `${fmtAsset(amount * 0.001)} ${selectedCoin.symbol}`,
+                    total: `${fmtMoney(total)} USDT`,
+                });
+                pushHistory("transactions", {
+                    time: stamp(new Date()),
+                    asset: "USDT",
+                    type: "Trade",
+                    amount: `${side === "buy" ? "-" : "+"}${fmtMoney(total)}`,
+                    status: "Completed",
+                    details: `Spot ${side === "buy" ? "Buy" : "Sell"} ${fmtAsset(amount)} ${selectedCoin.symbol}`,
+                });
+            }
+            
+            saveState();
+            updateUi();
+            amountInput.value = "";
+            renderCurrentHistoryTab();
+            syncBackendTransactions(120);
+
+        } catch (err) {
+            alert("Network error processing trade.");
         }
-        pushHistory("orders", {
-            time: stamp(new Date()),
-            pair: `${selectedCoin.symbol}/USDT`,
-            type: "Market",
-            side: side === "buy" ? "Buy" : "Sell",
-            price: fmtMoney(price),
-            amount: fmtAsset(amount),
-            filled: "100%",
-            status: "Filled",
-        });
-        pushHistory("trades", {
-            time: stamp(new Date()),
-            pair: `${selectedCoin.symbol}/USDT`,
-            side: side === "buy" ? "Buy" : "Sell",
-            price: fmtMoney(price),
-            executed: fmtAsset(amount),
-            fee: `${fmtAsset(amount * 0.001)} ${selectedCoin.symbol}`,
-            total: `${fmtMoney(total)} USDT`,
-        });
-        pushHistory("transactions", {
-            time: stamp(new Date()),
-            asset: "USDT",
-            type: "Trade",
-            amount: `${side === "buy" ? "-" : "+"}${fmtMoney(total)}`,
-            status: "Completed",
-            details: `Spot ${side === "buy" ? "Buy" : "Sell"} ${fmtAsset(amount)} ${selectedCoin.symbol}`,
-        });
-        saveState();
-        updateUi();
-        amountInput.value = "";
-        renderCurrentHistoryTab();
     }
 
     function initMarginTerminal() {
@@ -730,101 +929,70 @@
             alert(`Not enough USDT. Required margin: $${fmtMoney(marginRequired)}, Available: $${fmtMoney(usdtBalance)}`);
             return;
         }
-        createMarginOrder(side, amount, entry, leverage);
+        submitMarginPosition(side, amount, entry, leverage);
     }
 
-    function createMarginOrder(side, amount, entry, leverage) {
-        const marginRequired = (amount * entry) / leverage;
-        const usdtBalance = getWalletBalance("USDT");
-        if (marginRequired > usdtBalance) return alert("Not enough USDT margin.");
-        setWalletBalance("USDT", usdtBalance - marginRequired);
-        const order = {
-            id: `mo_${Date.now()}_${Math.random()}`,
-            side,
-            amount,
-            entry,
-            leverage,
-            margin: marginRequired,
-            time: stamp(new Date()),
-            status: "Open",
-        };
-        if (!state.marginOpenOrders) state.marginOpenOrders = [];
-        state.marginOpenOrders.push(order);
-        renderMarginOrders();
-        saveState();
-
-        setTimeout(() => {
-            fillMarginOrder(order.id);
-        }, 1200 + Math.random() * 1200);
+    async function submitMarginPosition(side, amount, entry, leverage) {
+        try {
+            const response = await fetch("/api/margin/order/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken"),
+                },
+                body: JSON.stringify({
+                    side,
+                    price: entry,
+                    size: amount,
+                    leverage,
+                    symbol: `${selectedCoin.symbol}USDT`,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                alert(data.message || data.error || "Margin order failed");
+                return;
+            }
+            if (Number.isFinite(Number(data?.new_usdt))) {
+                setWalletBalance("USDT", Number(data.new_usdt));
+            }
+            await syncBackendPositions();
+            await syncBackendTransactions(120);
+            renderMarginOrders();
+            renderCurrentHistoryTab();
+        } catch (error) {
+            alert("Network error while opening margin position.");
+        }
     }
 
-    function fillMarginOrder(orderId) {
-        if (!state.marginOpenOrders) state.marginOpenOrders = [];
-        const idx = state.marginOpenOrders.findIndex((o) => o.id === orderId);
-        if (idx === -1) return;
-        const order = state.marginOpenOrders[idx];
-        order.status = "Filled";
-        state.marginOpenOrders.splice(idx, 1);
-        state.positions.push({
-            id: `m_${Date.now()}_${Math.random()}`,
-            side: order.side,
-            amount: order.amount,
-            entry: order.entry,
-            leverage: order.leverage,
-            margin: order.margin,
-        });
-        pushHistory("orders", {
-            time: order.time,
-            pair: `${selectedCoin.symbol}/USDT`,
-            type: `Margin ${order.leverage}x`,
-            side: order.side === "long" ? "Buy" : "Sell",
-            price: fmtMoney(order.entry),
-            amount: fmtAsset(order.amount),
-            filled: "100%",
-            status: "Filled",
-        });
-        pushHistory("transactions", {
-            time: order.time,
-            asset: "USDT",
-            type: "Transfer",
-            amount: `${fmtMoney(order.margin)} (Margin Locked)`,
-            status: "Completed",
-            details: "Spot to Margin",
-        });
-        pushHistory("trades", {
-            time: order.time,
-            pair: `${selectedCoin.symbol}/USDT`,
-            side: order.side === "long" ? "Buy" : "Sell",
-            price: fmtMoney(order.entry),
-            executed: fmtAsset(order.amount),
-            fee: fmtMoney(order.entry * order.amount * 0.001),
-        });
-        saveState();
-        renderMarginOrders();
-        updateUi();
-        renderCurrentHistoryTab();
-    }
-
-    function closeAllMarginPositions() {
-        let released = 0;
-        state.positions.forEach((p) => {
-            const diff = p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice;
-            const back = p.margin + (diff * p.amount);
-            setWalletBalance("USDT", getWalletBalance("USDT") + back);
-            released += back;
-        });
-        state.positions = [];
-        pushHistory("transactions", {
-            time: stamp(new Date()),
-            asset: "USDT",
-            type: "Transfer",
-            amount: `+${fmtMoney(released)}`,
-            status: "Completed",
-            details: "Margin to Spot",
-        });
-        saveState();
-        updateUi();
-        renderCurrentHistoryTab();
+    async function closeAllMarginPositions() {
+        if (!state.positions.length) return;
+        try {
+            const response = await fetch("/api/margin/close-all/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken"),
+                },
+                body: JSON.stringify({
+                    symbol: `${selectedCoin.symbol}USDT`,
+                    close_price: lastPrice,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                alert(data.message || data.error || "Close margin positions failed");
+                return;
+            }
+            if (Number.isFinite(Number(data?.new_usdt))) {
+                setWalletBalance("USDT", Number(data.new_usdt));
+            }
+            await syncBackendPositions();
+            await syncBackendTransactions(120);
+            renderCurrentHistoryTab();
+        } catch (error) {
+            alert("Network error while closing margin positions.");
+        }
     }
 
     function initFuturesTerminal() {
@@ -837,7 +1005,7 @@
         setInterval(updateFundingClock, 1000);
     }
 
-    function openFuturesPosition(side, payload = {}) {
+    async function openFuturesPosition(side, payload = {}) {
         const amount = Number(payload.amount ?? ((qs("futuresAmountInput") || {}).value || 0));
         const entry = Number(payload.entry ?? ((qs("futuresPriceInput") || {}).value || lastPrice));
         const leverage = Math.min(125, Math.max(1, Number(payload.leverage ?? ((qs("futuresLeverageInput") || {}).value || 20))));
@@ -847,60 +1015,67 @@
         const marginRequired = (amount * entry) / leverage;
         const usdtBalance = getWalletBalance("USDT");
         if (marginRequired > usdtBalance) return alert("Not enough USDT for futures margin.");
-        setWalletBalance("USDT", usdtBalance - marginRequired);
-        state.futuresPositions.push({
-            id: `f_${Date.now()}_${Math.random()}`,
-            side,
-            amount,
-            entry,
-            leverage,
-            margin: marginRequired,
-            tp: tp > 0 ? tp : null,
-            sl: sl > 0 ? sl : null,
-        });
-        pushHistory("orders", {
-            time: stamp(new Date()),
-            pair: `${selectedCoin.symbol}/USDT`,
-            type: `Futures ${leverage}x`,
-            side: side === "long" ? "Buy" : "Sell",
-            price: fmtMoney(entry),
-            amount: fmtAsset(amount),
-            filled: "100%",
-            status: "Filled",
-        });
-        pushHistory("transactions", {
-            time: stamp(new Date()),
-            asset: "USDT",
-            type: "Transfer",
-            amount: `${fmtMoney(marginRequired)} (Futures Margin)`,
-            status: "Completed",
-            details: "Spot to Futures",
-        });
-        saveState();
-        updateUi();
+        try {
+            const response = await fetch("/api/futures/order/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken"),
+                },
+                body: JSON.stringify({
+                    side,
+                    price: entry,
+                    size: amount,
+                    leverage,
+                    tp,
+                    sl,
+                    symbol: `${selectedCoin.symbol}USDT`,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                alert(data.message || data.error || "Futures order failed");
+                return;
+            }
+            setWalletBalance("USDT", Number(data?.new_usdt ?? (usdtBalance - marginRequired)));
+        } catch (error) {
+            alert("Network error while opening futures position.");
+            return;
+        }
+        await syncBackendPositions();
         renderCurrentHistoryTab();
+        syncBackendTransactions(120);
     }
 
-    function closeAllFuturesPositions() {
-        let released = 0;
-        state.futuresPositions.forEach((p) => {
-            const diff = p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice;
-            const back = p.margin + (diff * p.amount);
-            setWalletBalance("USDT", getWalletBalance("USDT") + back);
-            released += back;
-        });
-        state.futuresPositions = [];
-        pushHistory("transactions", {
-            time: stamp(new Date()),
-            asset: "USDT",
-            type: "Transfer",
-            amount: `+${fmtMoney(released)}`,
-            status: "Completed",
-            details: "Futures to Spot",
-        });
-        saveState();
-        updateUi();
+    async function closeAllFuturesPositions() {
+        if (!state.futuresPositions.length) return;
+        try {
+            const response = await fetch("/api/futures/close-all/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken"),
+                },
+                body: JSON.stringify({
+                    symbol: `${selectedCoin.symbol}USDT`,
+                    close_price: lastPrice,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                alert(data.message || data.error || "Close futures positions failed");
+                return;
+            }
+            if (Number.isFinite(Number(data?.new_usdt))) {
+                setWalletBalance("USDT", Number(data.new_usdt));
+            }
+        } catch (error) {
+            alert("Network error while closing futures positions.");
+            return;
+        }
+        await syncBackendPositions();
         renderCurrentHistoryTab();
+        syncBackendTransactions(120);
     }
 
     function initEarnHub() {
@@ -2123,4 +2298,3 @@
         },
     };
 })();
-

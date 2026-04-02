@@ -6,6 +6,7 @@ Generated manually to bootstrap the backend so the development server can run.
 """
 
 from pathlib import Path
+from datetime import timedelta
 import os
 import dj_database_url
 from decouple import config
@@ -46,7 +47,7 @@ def _read_local_env_value(key: str):
 _local_debug = _read_local_env_value('DEBUG')
 DEBUG = _to_bool(_local_debug if _local_debug is not None else config('DEBUG', default='True'), default=True)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',')
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',') if h.strip()]
 
 # Allow Render domain
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -66,6 +67,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'channels',
+    'axes',
     'accounts',
     'core',
 ]
@@ -79,6 +81,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',
 ]
 
 ROOT_URLCONF = 'nexuscrypto.urls'
@@ -103,7 +106,7 @@ WSGI_APPLICATION = 'nexuscrypto.wsgi.application'
 ASGI_APPLICATION = 'nexuscrypto.asgi.application'
 
 # Database: use DATABASE_URL env var for PostgreSQL on Render, fallback to SQLite locally
-DATABASE_URL = os.environ.get('DATABASE_URL')
+DATABASE_URL = config('DATABASE_URL', default='')
 if DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL)
@@ -136,6 +139,20 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Authentication backends — axes backend MUST come first
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# django-axes: brute-force login protection
+AXES_FAILURE_LIMIT = 5                                  # lock after 5 wrong attempts
+AXES_COOLOFF_TIME = timedelta(minutes=30)               # unlock after 30 minutes
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]  # per user+IP combination
+AXES_RESET_ON_SUCCESS = True                            # reset counter on successful login
+AXES_LOCKOUT_TEMPLATE = None                            # we handle in view
+AXES_ENABLED = True
 
 CHANNEL_LAYERS = {
     "default": {
