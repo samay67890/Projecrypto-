@@ -10,8 +10,10 @@ from datetime import timedelta
 import os
 import dj_database_url
 from decouple import config
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me')
 
@@ -23,31 +25,12 @@ def _to_bool(value, default=True):
         return False
     return default
 
-def _read_local_env_value(key: str):
-    """Read a key from BASE_DIR/.env so project-local values can override machine env vars."""
-    env_path = BASE_DIR / '.env'
-    if not env_path.exists():
-        return None
-    try:
-        for raw in env_path.read_text(encoding='utf-8').splitlines():
-            line = raw.strip()
-            if not line or line.startswith('#') or '=' not in line:
-                continue
-            k, v = line.split('=', 1)
-            if k.strip() != key:
-                continue
-            value = v.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-                value = value[1:-1]
-            return value
-    except Exception:
-        return None
-    return None
-
-_local_debug = _read_local_env_value('DEBUG')
-DEBUG = _to_bool(_local_debug if _local_debug is not None else config('DEBUG', default='True'), default=True)
+DEBUG = _to_bool(config('DEBUG', default='False'), default=False)
 
 ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',') if h.strip()]
+DEFAULT_RENDER_HOST = 'projecrypto.onrender.com'
+if DEFAULT_RENDER_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(DEFAULT_RENDER_HOST)
 
 # Allow Render domain
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -56,6 +39,9 @@ if RENDER_EXTERNAL_HOSTNAME:
 
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='').split(',')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS if o.strip()]
+default_render_origin = f'https://{DEFAULT_RENDER_HOST}'
+if default_render_origin not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(default_render_origin)
 if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
 
@@ -105,17 +91,27 @@ TEMPLATES = [
 WSGI_APPLICATION = 'nexuscrypto.wsgi.application'
 ASGI_APPLICATION = 'nexuscrypto.asgi.application'
 
-# Database: use DATABASE_URL env var for PostgreSQL on Render, fallback to SQLite locally
-DATABASE_URL = config('DATABASE_URL', default='')
+# Database: use DATABASE_URL for both local and Render.
+# Example: postgresql://USER:PASSWORD@HOST:5432/DBNAME
+DATABASE_URL = config('DATABASE_URL', default='').strip()
 if DATABASE_URL:
+    db_config = {
+        'conn_max_age': 600,
+    }
+    if DATABASE_URL.startswith(('postgres://', 'postgresql://')):
+        db_config['ssl_require'] = not DEBUG
+
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            **db_config,
+        )
     }
 else:
     DATABASES = {
         'default': {
-            'ENGINE': config('DATABASE_ENGINE', default='django.db.backends.sqlite3'),
-            'NAME': BASE_DIR / config('DATABASE_NAME', default='db.sqlite3'),
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
@@ -135,8 +131,12 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Use non-strict storage to prevent 500 errors when static files aren't in manifest
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Use safer storage in production so stale/missing static references are caught at build time.
+STATICFILES_STORAGE = (
+    'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    if not DEBUG
+    else 'whitenoise.storage.CompressedStaticFilesStorage'
+)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -146,13 +146,19 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-# django-axes: brute-force login protection
-AXES_FAILURE_LIMIT = 5                                  # lock after 5 wrong attempts
-AXES_COOLOFF_TIME = timedelta(minutes=30)               # unlock after 30 minutes
-AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]  # per user+IP combination
-AXES_RESET_ON_SUCCESS = True                            # reset counter on successful login
-AXES_LOCKOUT_TEMPLATE = None                            # we handle in view
-AXES_ENABLED = True
+# django-axes: brute-force login protection tuned for fewer false lockouts.
+AXES_FAILURE_LIMIT = config('AXES_FAILURE_LIMIT', default=8, cast=int)
+AXES_COOLOFF_TIME = timedelta(minutes=config('AXES_COOLOFF_MINUTES', default=15, cast=int))
+AXES_LOCKOUT_PARAMETERS = [["username"]]
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = None
+AXES_ENABLED = _to_bool(config('AXES_ENABLED', default='True'), default=True)
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = _to_bool(config('SECURE_SSL_REDIRECT', default='True'), default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 CHANNEL_LAYERS = {
     "default": {

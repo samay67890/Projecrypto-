@@ -293,22 +293,27 @@ class SignupPasswordView(View):
 class SigninView(View):
     """Temporary sign-in page for existing users."""
 
+    @staticmethod
+    def _render_signin(request, email='', error='', lockout_message=''):
+        return render(request, 'core/signin.html', {
+            'email': email,
+            'error': error,
+            'lockout_message': lockout_message,
+        })
+
     def get(self, request):
         if request.user.is_authenticated:
             return redirect('dashboard')
 
         email = (request.GET.get('email') or request.session.pop('signin_hint_email', '')).strip().lower()
-        return render(request, 'core/signin.html', {'email': email})
+        return self._render_signin(request, email=email)
 
     def post(self, request):
         email = (request.POST.get('email') or '').strip().lower()
         password = request.POST.get('password') or ''
 
         if not email or not password:
-            return render(request, 'core/signin.html', {
-                'email': email,
-                'error': 'Please enter both email and password.',
-            })
+            return self._render_signin(request, email=email, error='Please enter both email and password.')
 
         # django-axes: attempt authentication — may raise AxesLockedOut
         try:
@@ -324,22 +329,19 @@ class SigninView(View):
                 # Final fallback for legacy auth edge cases.
                 user = candidate
         except PermissionDenied:
-            return render(request, 'core/signin.html', {
-                'email': email,
-                'error': 'Too many failed login attempts. Your account is temporarily locked. Please try again after 30 minutes.',
-            })
+            cooldown = getattr(settings, 'AXES_COOLOFF_TIME', timedelta(minutes=15))
+            lockout_minutes = int(cooldown.total_seconds() // 60) if hasattr(cooldown, 'total_seconds') else 15
+            lockout_text = (
+                f'Too many failed login attempts. '
+                f'Please wait about {lockout_minutes} minutes before trying again.'
+            )
+            return self._render_signin(request, email=email, lockout_message=lockout_text)
 
         if not user:
-            return render(request, 'core/signin.html', {
-                'email': email,
-                'error': 'Invalid email or password.',
-            })
+            return self._render_signin(request, email=email, error='Invalid email or password.')
 
         if not user.is_active:
-            return render(request, 'core/signin.html', {
-                'email': email,
-                'error': 'This account is inactive. Please contact support.',
-            })
+            return self._render_signin(request, email=email, error='This account is inactive. Please contact support.')
 
         if not hasattr(user, 'backend'):
             user.backend = 'django.contrib.auth.backends.ModelBackend'

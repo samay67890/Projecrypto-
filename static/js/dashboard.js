@@ -680,13 +680,18 @@
 
         results.innerHTML = "";
         matches.forEach((coin) => {
+            const symbol = String(coin.symbol || "").toUpperCase();
+            const name = String(coin.name || "").trim();
+            const isDuplicateLabel = !!name && name.toUpperCase() === symbol;
+            const metaLabel = isDuplicateLabel ? "" : name;
+
             const btn = document.createElement("button");
             btn.className = "search-item";
             btn.type = "button";
             btn.innerHTML = `
                 <span class="search-item-left">
-                    <span class="coin-badge">${coin.symbol.slice(0, 3)}</span>
-                    <span>${coin.symbol} <span class="search-item-meta">${coin.name}</span></span>
+                    <span class="coin-badge">${symbol.slice(0, 3)}</span>
+                    <span>${symbol}${metaLabel ? ` <span class="search-item-meta">${metaLabel}</span>` : ""}</span>
                 </span>
                 <span>$${fmtMoney(coin.price || 0)}</span>
             `;

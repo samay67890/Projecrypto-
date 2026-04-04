@@ -52,6 +52,11 @@
 
                 <form action="{% url 'login' %}" method="post" id="signin-form">
                     {% csrf_token %}
+                    {% if lockout_message %}
+                    <div class="form-error" style="background: rgba(245, 158, 11, 0.18); border-left: 3px solid #f59e0b; color: #fef3c7;">
+                        {{ lockout_message }}
+                    </div>
+                    {% endif %}
                     {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
                     <div class="input-group">
                         <label for="id_email">Email</label>
