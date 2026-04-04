@@ -343,8 +343,7 @@ class SigninView(View):
         if not user.is_active:
             return self._render_signin(request, email=email, error='This account is inactive. Please contact support.')
 
-        if not hasattr(user, 'backend'):
-            user.backend = 'django.contrib.auth.backends.ModelBackend'
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
         auth_login(request, user)
         # Ensure wallet always exists for authenticated users.
         _ensure_wallet(user)
@@ -431,6 +430,7 @@ class SignupVerifyOtpView(View):
         for key in ('signup_email', 'signup_password_plain'):
             request.session.pop(key, None)
         request.session['show_welcome'] = True
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
         auth_login(request, user)
         return redirect('welcome')
 

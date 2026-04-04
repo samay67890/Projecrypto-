@@ -103,11 +103,15 @@
 
         function buildMarginRows(snapshot) {
             const positions = Array.isArray(snapshot?.margin?.positions) ? snapshot.margin.positions : [];
-            const mark = Number(snapshot?.spot?.markPrice || 0);
-            const symbol = snapshot?.selectedCoin?.symbol || "Asset";
             return positions.map((p) => {
-                const pnl = (p.side === "long" ? mark - p.entry : p.entry - mark) * p.amount;
-                const current = Number(p.margin || 0) + pnl;
+                const symbol = String(p.symbol || snapshot?.selectedCoin?.symbol || "Asset").toUpperCase();
+                const mark = Number(p.markPrice || snapshot?.spot?.markPrice || 0);
+                const pnl = Number.isFinite(Number(p.pnl))
+                    ? Number(p.pnl)
+                    : ((p.side === "long" ? mark - p.entry : p.entry - mark) * p.amount);
+                const current = Number.isFinite(Number(p.current))
+                    ? Number(p.current)
+                    : (Number(p.margin || 0) + pnl);
                 return {
                     market: `${symbol}/USDT`,
                     type: `Margin ${p.leverage}x`,
@@ -121,11 +125,15 @@
 
         function buildFuturesRows(snapshot) {
             const positions = Array.isArray(snapshot?.futures?.positions) ? snapshot.futures.positions : [];
-            const mark = Number(snapshot?.spot?.markPrice || 0);
-            const symbol = snapshot?.selectedCoin?.symbol || "Asset";
             return positions.map((p) => {
-                const pnl = (p.side === "long" ? mark - p.entry : p.entry - mark) * p.amount;
-                const current = Number(p.margin || 0) + pnl;
+                const symbol = String(p.symbol || snapshot?.selectedCoin?.symbol || "Asset").toUpperCase();
+                const mark = Number(p.markPrice || snapshot?.spot?.markPrice || 0);
+                const pnl = Number.isFinite(Number(p.pnl))
+                    ? Number(p.pnl)
+                    : ((p.side === "long" ? mark - p.entry : p.entry - mark) * p.amount);
+                const current = Number.isFinite(Number(p.current))
+                    ? Number(p.current)
+                    : (Number(p.margin || 0) + pnl);
                 return {
                     market: `${symbol}/USDT`,
                     type: `Futures ${p.leverage}x`,

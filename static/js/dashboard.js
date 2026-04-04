@@ -28,7 +28,7 @@
     let tradeFlushTimer = null;
     let pendingTradePrice = null;
     let pendingTradeQty = null;
-    let marketLoops = { ticker: null, depth: null, sim: null };
+    let marketLoops = { ticker: null, depth: null, positions: null, sim: null };
     let chart = null;
     let futuresChart = null;
     let earnState = { tab: "flex", sort: "apy_desc", page: 1, pageSize: 9 };
@@ -235,7 +235,7 @@
             margin: Number(position.margin || 0),
             tp: position.take_profit != null ? Number(position.take_profit) : null,
             sl: position.stop_loss != null ? Number(position.stop_loss) : null,
-            symbol: String(position.symbol || selectedCoin.marketSymbol || "BTCUSDT"),
+            symbol: normalizeAssetSymbol(position.symbol || selectedCoin.marketSymbol || "BTCUSDT"),
         };
     }
 
@@ -431,9 +431,36 @@
     }
 
     function getAssetMarkPrice(symbol) {
-        if (symbol === selectedCoin.symbol) return lastPrice;
-        const coin = coinUniverse.find((x) => String(x.symbol || "").toUpperCase() === symbol);
+        const normalized = String(symbol || "")
+            .toUpperCase()
+            .replace(/[^A-Z]/g, "")
+            .replace(/USDT$/, "");
+        if (!normalized) return 0;
+        if (normalized === selectedCoin.symbol) return lastPrice;
+        const coin = coinUniverse.find((x) => String(x.symbol || "").toUpperCase() === normalized);
         return Number(coin?.price || 0);
+    }
+
+    function normalizeAssetSymbol(symbol) {
+        return String(symbol || "")
+            .toUpperCase()
+            .replace(/[^A-Z]/g, "")
+            .replace(/USDT$/, "") || selectedCoin.symbol;
+    }
+
+    function getPositionMarkPrice(position) {
+        const symbol = normalizeAssetSymbol(position?.symbol || selectedCoin.symbol);
+        const mark = getAssetMarkPrice(symbol);
+        return Number.isFinite(mark) && mark > 0 ? mark : lastPrice;
+    }
+
+    function calcPositionPnl(position) {
+        const mark = getPositionMarkPrice(position);
+        const entry = Number(position?.entry || 0);
+        const amount = Number(position?.amount || 0);
+        const side = String(position?.side || "").toLowerCase();
+        if (!Number.isFinite(entry) || !Number.isFinite(amount)) return 0;
+        return (side === "long" ? mark - entry : entry - mark) * amount;
     }
 
     function initViews() {
@@ -1583,6 +1610,7 @@
     function restartMarketStreams() {
         if (marketLoops.ticker) clearInterval(marketLoops.ticker);
         if (marketLoops.depth) clearInterval(marketLoops.depth);
+        if (marketLoops.positions) clearInterval(marketLoops.positions);
         if (tradeSocket && tradeSocket.readyState <= 1) tradeSocket.close();
         if (tradeFlushTimer) clearInterval(tradeFlushTimer);
         tradeFlushTimer = null;
@@ -1591,11 +1619,43 @@
         }
         marketLoops.ticker = setInterval(refreshTicker, 10000);
         marketLoops.depth = setInterval(refreshDepth, 5000);
+        marketLoops.positions = setInterval(refreshOpenPositionMarks, 2500);
     }
 
     function refreshMarketDataNow() {
         refreshTicker();
         refreshDepth();
+        refreshOpenPositionMarks();
+    }
+
+    async function refreshOpenPositionMarks() {
+        if (USE_SIM_MARKET || dataProvider !== "binance") return;
+        const positionSymbols = new Set(
+            [...(state.positions || []), ...(state.futuresPositions || [])]
+                .map((p) => normalizeAssetSymbol(p.symbol))
+                .filter(Boolean)
+        );
+        if (!positionSymbols.size) return;
+
+        try {
+            await Promise.all([...positionSymbols].slice(0, 12).map(async (symbol) => {
+                if (symbol === selectedCoin.symbol) return;
+                const response = await fetch(`${BINANCE_API_BASE}/ticker-24hr/?symbol=${symbol}USDT`);
+                if (!response.ok) return;
+                const data = await response.json();
+                const price = Number(data.lastPrice || 0);
+                if (!Number.isFinite(price) || price <= 0) return;
+                const change = Number(data.priceChangePercent || 0);
+                const coinRef = coinUniverse.find((c) => String(c.symbol || "").toUpperCase() === symbol);
+                if (coinRef) {
+                    coinRef.price = price;
+                    if (Number.isFinite(change)) coinRef.change24h = change;
+                }
+            }));
+            updateUi();
+        } catch (error) {
+            reportError("positions.ticker", error);
+        }
     }
 
     async function refreshTicker() {
@@ -1908,13 +1968,35 @@
             wallet: { ...(state.wallet || {}) },
             margin: {
                 locked: marginLocked,
-                pnl: state.positions.reduce((sum, p) => sum + ((p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice) * p.amount), 0),
-                positions: state.positions.map((p) => ({ ...p })),
+                pnl: state.positions.reduce((sum, p) => sum + calcPositionPnl(p), 0),
+                positions: state.positions.map((p) => {
+                    const markPrice = getPositionMarkPrice(p);
+                    const pnlValue = calcPositionPnl(p);
+                    const symbol = normalizeAssetSymbol(p.symbol || selectedCoin.symbol);
+                    return {
+                        ...p,
+                        symbol,
+                        markPrice,
+                        pnl: pnlValue,
+                        current: Number(p.margin || 0) + pnlValue,
+                    };
+                }),
             },
             futures: {
                 locked: futuresLocked,
-                pnl: state.futuresPositions.reduce((sum, p) => sum + ((p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice) * p.amount), 0),
-                positions: state.futuresPositions.map((p) => ({ ...p })),
+                pnl: state.futuresPositions.reduce((sum, p) => sum + calcPositionPnl(p), 0),
+                positions: state.futuresPositions.map((p) => {
+                    const markPrice = getPositionMarkPrice(p);
+                    const pnlValue = calcPositionPnl(p);
+                    const symbol = normalizeAssetSymbol(p.symbol || selectedCoin.symbol);
+                    return {
+                        ...p,
+                        symbol,
+                        markPrice,
+                        pnl: pnlValue,
+                        current: Number(p.margin || 0) + pnlValue,
+                    };
+                }),
             },
             history: {
                 orders: [...state.history.orders],
@@ -1930,8 +2012,8 @@
     }
 
     function calcOpenPnl() {
-        const marginPnl = state.positions.reduce((sum, p) => sum + ((p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice) * p.amount), 0);
-        const futPnl = state.futuresPositions.reduce((sum, p) => sum + ((p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice) * p.amount), 0);
+        const marginPnl = state.positions.reduce((sum, p) => sum + calcPositionPnl(p), 0);
+        const futPnl = state.futuresPositions.reduce((sum, p) => sum + calcPositionPnl(p), 0);
         return marginPnl + futPnl;
     }
 
@@ -1944,10 +2026,11 @@
             return;
         }
         state.positions.forEach((p) => {
-            const pnl = (p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice) * p.amount;
+            const pnl = calcPositionPnl(p);
+            const symbol = normalizeAssetSymbol(p.symbol || selectedCoin.symbol);
             const row = document.createElement("div");
             row.className = `position-item ${p.side}`;
-            row.innerHTML = `<span>${p.side.toUpperCase()} ${fmtAsset(p.amount)} ${selectedCoin.symbol} @ ${fmtMoney(p.entry)} (${p.leverage}x)</span><span style="color:${pnl >= 0 ? "var(--green)" : "var(--red)"}">${pnl >= 0 ? "+" : ""}$${fmtMoney(pnl)}</span>`;
+            row.innerHTML = `<span>${p.side.toUpperCase()} ${fmtAsset(p.amount)} ${symbol} @ ${fmtMoney(p.entry)} (${p.leverage}x)</span><span style="color:${pnl >= 0 ? "var(--green)" : "var(--red)"}">${pnl >= 0 ? "+" : ""}$${fmtMoney(pnl)}</span>`;
             list.appendChild(row);
         });
     }
@@ -2020,11 +2103,12 @@
         if (posList) {
             posList.innerHTML = "";
             state.positions.forEach((p) => {
-                const pnl = (p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice) * p.amount;
+                const pnl = calcPositionPnl(p);
+                const symbol = normalizeAssetSymbol(p.symbol || selectedCoin.symbol);
                 const row = document.createElement("tr");
                 row.innerHTML = `
                     <td>${p.side === "long" ? "Long" : "Short"}</td>
-                    <td>${fmtAsset(p.amount)} ${selectedCoin.symbol}</td>
+                    <td>${fmtAsset(p.amount)} ${symbol}</td>
                     <td class="right">$${fmtMoney(p.entry)}</td>
                     <td class="right">${p.leverage}x</td>
                     <td class="right" style="color:${pnl >= 0 ? "var(--green)" : "var(--red)"}">${pnl >= 0 ? "+" : ""}$${fmtMoney(pnl)}</td>
@@ -2159,12 +2243,13 @@
             return;
         }
         state.futuresPositions.forEach((p) => {
-            const pnl = (p.side === "long" ? lastPrice - p.entry : p.entry - lastPrice) * p.amount;
+            const pnl = calcPositionPnl(p);
             const liq = p.side === "long" ? p.entry * (1 - (1 / p.leverage)) : p.entry * (1 + (1 / p.leverage));
+            const symbol = normalizeAssetSymbol(p.symbol || selectedCoin.symbol);
             const row = document.createElement("div");
             row.className = `future-position-row ${p.side}`;
             row.innerHTML = `
-                <span>${p.side.toUpperCase()} ${fmtAsset(p.amount)} ${selectedCoin.symbol} @ ${fmtMoney(p.entry)} (${p.leverage}x)</span>
+                <span>${p.side.toUpperCase()} ${fmtAsset(p.amount)} ${symbol} @ ${fmtMoney(p.entry)} (${p.leverage}x)</span>
                 <span>TP:${p.tp ? fmtMoney(p.tp) : "-"} SL:${p.sl ? fmtMoney(p.sl) : "-"}</span>
                 <span>Liq: ${fmtMoney(liq)}</span>
                 <span style="color:${pnl >= 0 ? "var(--green)" : "var(--red)"}">${pnl >= 0 ? "+" : ""}$${fmtMoney(pnl)}</span>
