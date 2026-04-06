@@ -22,6 +22,22 @@
     </header>
 
     <main class="container">
+        <section class="withdraw-section">
+            <h2 class="category-title">Withdraw USDT</h2>
+            <div class="withdraw-card">
+                <div class="withdraw-balance">Available Balance: <strong id="availableBalance">{{ initial_usdt|default:0 }}</strong> USDT</div>
+                <form id="withdrawalForm" class="withdraw-form">
+                    <label for="withdrawAmount">Amount</label>
+                    <input type="number" id="withdrawAmount" min="0" step="0.00000001" placeholder="Enter withdrawal amount" required>
+                    <label for="withdrawWalletAddress">Destination Wallet Address</label>
+                    <input type="text" id="withdrawWalletAddress" value="{{ wallet_address|default:'' }}" placeholder="Enter destination wallet address" required>
+                    <button type="submit" class="btn btn-primary">Withdraw</button>
+                </form>
+                <p class="withdraw-minimum">Minimum withdrawal amount: {{ minimum_withdrawal_amount }} USDT</p>
+                <div id="withdrawMessage" class="withdraw-message" role="alert" aria-live="polite"></div>
+            </div>
+        </section>
+
         <div class="search-container">
             <i class="fas fa-search search-icon"></i>
             <input type="text" id="methodSearch" class="search-bar" placeholder="Search bank, wallet or crypto...">
@@ -101,7 +117,9 @@
 
     <script>
         window.nexusBootstrap = {
-            initialUSDT: 1000000,
+            initialUSDT: {{ initial_usdt|default:0 }},
+            walletAddress: "{{ wallet_address|default:''|escapejs }}",
+            minWithdrawalAmount: {{ minimum_withdrawal_amount|default:10 }},
             userLabel: "{{ request.user.first_name|default:request.user.email|escapejs }}",
             userId: "{{ request.user.id|default:''|escapejs }}"
         };

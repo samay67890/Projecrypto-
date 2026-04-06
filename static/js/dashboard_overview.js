@@ -53,10 +53,22 @@
 
         function analyzeTrades(snapshot) {
             const trades = Array.isArray(snapshot?.history?.trades) ? [...snapshot.history.trades].reverse() : [];
+            const marketPrices = snapshot?.marketPrices && typeof snapshot.marketPrices === "object"
+                ? snapshot.marketPrices
+                : {};
             const books = {};
-            let realizedPnl = 0;
+            let realizedSpotPnl = 0;
+            let realizedDerivativesPnl = 0;
 
             trades.forEach((t) => {
+                const eventType = String(t.eventType || "").toLowerCase();
+                const marketType = String(t.marketType || "").toLowerCase();
+                const explicitRealized = Number(t.profitLoss);
+                if (Number.isFinite(explicitRealized) && (eventType.includes("close") || marketType === "margin" || marketType === "futures")) {
+                    realizedDerivativesPnl += explicitRealized;
+                    return;
+                }
+
                 const pair = String(t.pair || "Unknown");
                 if (!books[pair]) books[pair] = { qty: 0, cost: 0 };
                 const qty = Math.max(0, toNum(t.executed));
@@ -73,7 +85,7 @@
                 const sellQty = Math.min(qty, book.qty);
                 const avgCost = book.qty > 0 ? (book.cost / book.qty) : 0;
                 const soldCost = avgCost * sellQty;
-                realizedPnl += (total - soldCost);
+                realizedSpotPnl += (total - soldCost);
                 book.qty -= sellQty;
                 book.cost -= soldCost;
                 if (book.qty < 1e-12) {
@@ -83,9 +95,12 @@
             });
 
             const rows = Object.entries(books).map(([pair, b]) => {
-                const symbol = pair.split("/")[0];
-                const isCurrent = symbol === snapshot?.selectedCoin?.symbol;
-                const markPrice = isCurrent ? Number(snapshot?.spot?.markPrice || 0) : (b.qty > 0 ? b.cost / b.qty : 0);
+                const symbol = String(pair.split("/")[0] || "").toUpperCase();
+                const livePrice = Number(marketPrices[symbol] || 0);
+                const isCurrent = symbol === String(snapshot?.selectedCoin?.symbol || "").toUpperCase();
+                const markPrice = isCurrent
+                    ? Number(snapshot?.spot?.markPrice || livePrice || 0)
+                    : (livePrice > 0 ? livePrice : (b.qty > 0 ? b.cost / b.qty : 0));
                 const current = b.qty * markPrice;
                 const pnl = current - b.cost;
                 return {
@@ -98,6 +113,7 @@
                 };
             }).filter((r) => r.quantity > 0 || r.invested > 0);
 
+            const realizedPnl = realizedSpotPnl + realizedDerivativesPnl;
             return { rows, realizedPnl };
         }
 
@@ -220,13 +236,19 @@
             const spotValue = Number(snapshot.usdt || 0) + Number(snapshot.spot?.value || 0);
             const marginValue = Number(snapshot.margin?.locked || 0) + Number(snapshot.margin?.pnl || 0);
             const futuresValue = Number(snapshot.futures?.locked || 0) + Number(snapshot.futures?.pnl || 0);
-            const earnValue = 0;
+            const earnValue = Number(snapshot?.earn?.value || 0);
 
             const tradeAnalysis = analyzeTrades(snapshot);
             const txAnalysis = analyzeTransactions(snapshot);
 
             const initialInvestment = Number(snapshot.initialInvestment || 0) + txAnalysis.capitalIn - txAnalysis.capitalOut;
-            const netInvested = Math.max(0, tradeAnalysis.rows.reduce((sum, r) => sum + r.invested, 0) + marginValue + futuresValue);
+            const netInvested = Math.max(
+                0,
+                tradeAnalysis.rows.reduce((sum, r) => sum + r.invested, 0)
+                + marginValue
+                + futuresValue
+                + Number(snapshot?.earn?.principal || 0)
+            );
 
             setSensitiveValue("overviewTotalValue", fmtMoney(total));
             setSensitiveValue("overviewFiatSpotValue", fmtMoney(spotValue));

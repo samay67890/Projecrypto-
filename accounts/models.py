@@ -125,6 +125,16 @@ class WalletTransaction(models.Model):
     TRANSACTION_TYPES = (
         ('deposit', 'Deposit'),
         ('withdrawal', 'Withdrawal'),
+        ('spot_buy_quote', 'Spot Buy (Quote Debit)'),
+        ('spot_buy_asset', 'Spot Buy (Asset Credit)'),
+        ('spot_sell_asset', 'Spot Sell (Asset Debit)'),
+        ('spot_sell_quote', 'Spot Sell (Quote Credit)'),
+        ('margin_open', 'Margin Open (USDT Debit)'),
+        ('margin_close', 'Margin Close (USDT Credit)'),
+        ('margin_close_loss', 'Margin Close (USDT Debit)'),
+        ('futures_open', 'Futures Open (USDT Debit)'),
+        ('futures_close', 'Futures Close (USDT Credit)'),
+        ('futures_close_loss', 'Futures Close (USDT Debit)'),
     )
     STATUS_CHOICES = (
         ('completed', 'Completed'),

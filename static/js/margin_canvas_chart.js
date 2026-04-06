@@ -25,8 +25,11 @@
     let lastRender = 0;
     let containerEl = null;
     let statusEl = null;
+    let initRetryTimer = null;
+    let initRetryCount = 0;
 
     function init() {
+        if (chartReady) return;
         const container = document.getElementById(containerId);
         if (!container) return;
         containerEl = container;
@@ -53,12 +56,22 @@
         setActiveSymbol(initial);
 
         chartReady = true;
+        initRetryCount = 0;
+        if (initRetryTimer) {
+            clearTimeout(initRetryTimer);
+            initRetryTimer = null;
+        }
     }
 
     function scheduleInit() {
         if (containerEl && containerEl.clientWidth > 0 && containerEl.clientHeight > 0) {
             init();
             return;
+        }
+        if (initRetryTimer) clearTimeout(initRetryTimer);
+        if (initRetryCount < 20) {
+            initRetryCount += 1;
+            initRetryTimer = setTimeout(init, 150);
         }
         document.addEventListener("nexus:view:change", (event) => {
             if (event.detail?.view === "margin") init();

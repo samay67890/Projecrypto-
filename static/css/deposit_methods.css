@@ -80,6 +80,72 @@ body {
     margin-bottom: 34px;
 }
 
+.withdraw-section {
+    margin-bottom: 28px;
+}
+
+.withdraw-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+}
+
+.withdraw-balance {
+    font-size: 14px;
+    margin-bottom: 14px;
+    color: var(--text-dim);
+}
+
+.withdraw-balance strong {
+    color: var(--text);
+}
+
+.withdraw-form {
+    display: grid;
+    gap: 10px;
+}
+
+.withdraw-form label {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.withdraw-form input {
+    width: 100%;
+    background: #070a0d;
+    border: 1px solid #323c49;
+    border-radius: 10px;
+    color: #fff;
+    padding: 11px 12px;
+    outline: none;
+    font-size: 14px;
+}
+
+.withdraw-form input:focus {
+    border-color: var(--accent);
+}
+
+.withdraw-minimum {
+    margin: 12px 0 0;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.withdraw-message {
+    margin-top: 12px;
+    font-size: 13px;
+    min-height: 20px;
+}
+
+.withdraw-message.success {
+    color: #61d091;
+}
+
+.withdraw-message.error {
+    color: #ff7f7f;
+}
+
 .search-bar {
     width: 100%;
     background: var(--card-bg);

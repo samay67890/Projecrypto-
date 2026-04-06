@@ -77,7 +77,7 @@
                             <div class="summary-cards">
                                 <div class="summary-card">
                                     <label>Wallet (USDT)</label>
-                                    <strong data-balance-usdt>1000000.00</strong>
+                                    <strong data-balance-usdt>{{ initial_usdt|floatformat:2 }}</strong>
                                 </div>
                                 <div class="summary-card">
                                     <label>Wallet (<span id="walletCoinSymbol">BTC</span>)</label>
@@ -102,7 +102,7 @@
 
                             <div class="trade-meta">
                                 <span>Available</span>
-                                <span><span data-balance-usdt>1000000.00</span> USDT</span>
+                                <span><span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> USDT</span>
                             </div>
 
                             <div class="input-box">
@@ -136,7 +136,7 @@
                         <div class="fiat-balance-card">
                             <div class="glow-orb"></div>
                             <span>Fiat and Spot Balance</span>
-                            <h1>$<span data-balance-usdt>1000000.00</span> <small>~ <span data-balance-btc>0.000000</span> <span id="fiatCoinSymbol">BTC</span></small></h1>
+                            <h1>$<span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> <small>~ <span data-balance-btc>{{ initial_btc|floatformat:6 }}</span> <span id="fiatCoinSymbol">BTC</span></small></h1>
                             <div class="fiat-actions">
                                 <button class="gradient-btn deposit-btn" type="button" data-deposit-url="{% url 'deposit_methods' %}">Deposit</button>
                                 <button class="outline-btn">Withdraw</button>
@@ -160,8 +160,8 @@
                                             <div class="asset-icon usdt"><i class="fas fa-dollar-sign"></i></div>
                                             <b>USDT <span>Tether</span></b>
                                         </td>
-                                        <td><span data-balance-usdt>1000000.00</span> USDT</td>
-                                        <td><span data-balance-usdt>1000000.00</span> USDT</td>
+                                        <td><span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> USDT</td>
+                                        <td><span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> USDT</td>
                                         <td>0.00</td>
                                         <td class="right action-link" data-view="margin">Trade</td>
                                     </tr>
@@ -201,7 +201,7 @@
                                 </div>
                                 <div class="margin-stat">
                                     <span class="label">Available USDT</span>
-                                    <span class="value"><span data-balance-usdt>1000000.00</span> USDT</span>
+                                    <span class="value"><span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> USDT</span>
                                 </div>
                                 <div class="margin-stat">
                                     <span class="label">Available <span id="marginAssetSymbol">BTC</span></span>
@@ -240,10 +240,10 @@
                                 <div class="margin-chart-panel">
                                     <div class="margin-chart-tabs">
                                         <div class="tabs-left">
-                                            <button class="tab active" type="button">Chart</button>
-                                            <button class="tab" type="button">Info</button>
-                                            <button class="tab" type="button">Trading Data</button>
-                                            <button class="tab" type="button">Square</button>
+                                            <button class="tab active" type="button" data-margin-tab="chart">Chart</button>
+                                            <button class="tab" type="button" data-margin-tab="info">Info</button>
+                                            <button class="tab" type="button" data-margin-tab="trading-data">Trading Data</button>
+                                            <button class="tab" type="button" data-margin-tab="square">Square</button>
                                         </div>
                                         <div class="tabs-right chart-toolbar margin-chart-toolbar">
                                             <span>Time</span>
@@ -257,26 +257,68 @@
                                         </div>
                                     </div>
                                     <div class="margin-chart-wrap">
-                                        <div id="marginChart" class="margin-tradingview"></div>
-                                        <div class="margin-chart-overlay">
-                                            <span class="ma ma7" id="marginMA7">MA(7): 0.00</span>
-                                            <span class="ma ma25" id="marginMA25">MA(25): 0.00</span>
-                                            <span class="ma ma99" id="marginMA99">MA(99): 0.00</span>
-                                        </div>
-                                        <div class="margin-quick-trade">
-                                            <div class="quick-card buy">
-                                                <span class="label">Market Buy</span>
-                                                <span class="value" id="marginMarketBuy">0.00</span>
+                                        <section class="margin-tab-panel active" data-margin-panel="chart">
+                                            <div id="marginChart" class="margin-tradingview"></div>
+                                            <div class="margin-chart-overlay">
+                                                <span class="ma ma7" id="marginMA7">MA(7): 0.00</span>
+                                                <span class="ma ma25" id="marginMA25">MA(25): 0.00</span>
+                                                <span class="ma ma99" id="marginMA99">MA(99): 0.00</span>
                                             </div>
-                                            <div class="quick-input">
-                                                <span class="label">Amount(BTC)</span>
-                                                <input id="marginQuickAmount" type="text" placeholder="Enter Amount">
+                                            <div class="margin-quick-trade">
+                                                <div class="quick-card buy">
+                                                    <span class="label">Market Buy</span>
+                                                    <span class="value" id="marginMarketBuy">0.00</span>
+                                                </div>
+                                                <div class="quick-input">
+                                                    <span class="label">Amount(BTC)</span>
+                                                    <input id="marginQuickAmount" type="text" placeholder="Enter Amount">
+                                                </div>
+                                                <div class="quick-card sell">
+                                                    <span class="label">Market Sell</span>
+                                                    <span class="value" id="marginMarketSell">0.00</span>
+                                                </div>
                                             </div>
-                                            <div class="quick-card sell">
-                                                <span class="label">Market Sell</span>
-                                                <span class="value" id="marginMarketSell">0.00</span>
+                                        </section>
+
+                                        <section class="margin-tab-panel" data-margin-panel="info">
+                                            <div class="margin-data-card">
+                                                <h4>Wallet Info</h4>
+                                                <div class="margin-data-grid">
+                                                    <div><span>USDT Wallet</span><strong id="marginInfoWalletUsdt">$0.00</strong></div>
+                                                    <div><span>Asset Wallet</span><strong id="marginInfoWalletAsset">0.000000 BTC</strong></div>
+                                                    <div><span>Total Equity</span><strong id="marginInfoEquity">$0.00</strong></div>
+                                                    <div><span>Earn Value</span><strong id="marginInfoEarn">$0.00</strong></div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        </section>
+
+                                        <section class="margin-tab-panel" data-margin-panel="trading-data">
+                                            <div class="margin-data-card">
+                                                <h4>Trading Data</h4>
+                                                <div class="margin-data-grid">
+                                                    <div><span>Margin Locked</span><strong id="marginTradingLocked">$0.00</strong></div>
+                                                    <div><span>Futures Locked</span><strong id="marginTradingFutures">$0.00</strong></div>
+                                                    <div><span>Open Positions</span><strong id="marginTradingPositions">0</strong></div>
+                                                    <div><span>Open PNL</span><strong id="marginTradingOpenPnl">$0.00</strong></div>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        <section class="margin-tab-panel" data-margin-panel="square">
+                                            <div class="margin-data-card">
+                                                <h4>Square</h4>
+                                                <div class="margin-square-head">
+                                                    <a href="#" id="marginSquareDataLink">Data</a>
+                                                    <span>Order Book</span>
+                                                </div>
+                                                <div class="margin-data-grid">
+                                                    <div><span>Best Ask</span><strong id="marginSquareBestAsk">--</strong></div>
+                                                    <div><span>Best Bid</span><strong id="marginSquareBestBid">--</strong></div>
+                                                    <div><span>Spread</span><strong id="marginSquareSpread">--</strong></div>
+                                                    <div><span>Last Price</span><strong id="marginSquareLast">$0.00</strong></div>
+                                                </div>
+                                            </div>
+                                        </section>
                                     </div>
                                 </div>
 
@@ -747,7 +789,7 @@
                     <div class="history-view">
                         <div class="history-header">
                             <h2>Orders & Transactions</h2>
-                            <div class="history-balance">Wallet Balance: <span data-balance-usdt>1000000.00</span> USDT</div>
+                            <div class="history-balance">Wallet Balance: <span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> USDT</div>
                         </div>
 
                         <div class="history-tabs">
@@ -974,7 +1016,7 @@
 
     <script>
         window.nexusBootstrap = {
-            initialUSDT: 1000000,
+            initialUSDT: {{ initial_usdt|default:0 }},
             coinApiKey: "{{ COINAPI_API_KEY|default:''|escapejs }}",
             userLabel: "{{ request.user.first_name|default:request.user.email|escapejs }}",
             userId: "{{ request.user.id|default:''|escapejs }}"

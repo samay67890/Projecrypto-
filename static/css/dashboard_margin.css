@@ -364,6 +364,76 @@
     z-index: 0;
 }
 
+.margin-tab-panel {
+    display: none;
+    position: absolute;
+    inset: 0;
+}
+
+.margin-tab-panel.active {
+    display: block;
+}
+
+.margin-data-card {
+    height: 100%;
+    padding: 20px;
+    background: linear-gradient(180deg, rgba(12, 15, 20, 0.78), rgba(10, 13, 18, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: auto;
+}
+
+.margin-data-card h4 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    color: #d1d5db;
+    letter-spacing: 0.3px;
+}
+
+.margin-data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.margin-data-grid div {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: rgba(20, 24, 31, 0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.margin-data-grid span {
+    color: #6b7785;
+    font-size: 11px;
+}
+
+.margin-data-grid strong {
+    color: #e5e7eb;
+    font-size: 13px;
+    font-family: "IBM Plex Mono", monospace;
+}
+
+.margin-square-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.margin-square-head a {
+    color: #f0b90b;
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.margin-square-head span {
+    color: #9ca3af;
+    font-size: 12px;
+}
+
 #marginChart {
     position: absolute;
     inset: 0;
@@ -1123,6 +1193,9 @@
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
+    }
+    .margin-data-grid {
+        grid-template-columns: 1fr;
     }
     .margin-stats {
         width: 100%;

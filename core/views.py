@@ -1,5 +1,6 @@
 import random
 import logging
+import re
 import traceback
 from datetime import timedelta
 from decimal import Decimal
@@ -31,6 +32,8 @@ from core.email_service import send_otp_email
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+MIN_WITHDRAWAL_AMOUNT = Decimal("10")
+WALLET_ADDRESS_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9\-_]{5,254}$")
 
 
 def _normalize_asset_symbol(value: str | None) -> str:
@@ -47,8 +50,33 @@ def _ensure_wallet(user):
     return wallet
 
 
+def _is_valid_wallet_address(address: str | None) -> bool:
+    return bool(WALLET_ADDRESS_PATTERN.fullmatch((address or "").strip()))
+
+
 def _wallet_transaction_to_history_row(tx: WalletTransaction):
-    amount_text = f"+{tx.amount}" if tx.tx_type == 'deposit' else f"-{tx.amount}"
+    credit_types = {
+        'deposit',
+        'spot_buy_asset',
+        'spot_sell_quote',
+        'margin_close',
+        'futures_close',
+    }
+    debit_types = {
+        'withdrawal',
+        'spot_buy_quote',
+        'spot_sell_asset',
+        'margin_open',
+        'margin_close_loss',
+        'futures_open',
+        'futures_close_loss',
+    }
+    sign = '+'
+    if tx.tx_type in debit_types:
+        sign = '-'
+    elif tx.tx_type in credit_types:
+        sign = '+'
+    amount_text = f"{sign}{tx.amount}"
     return {
         "kind": "wallet_transaction",
         "time": tx.created_at.isoformat() if tx.created_at else None,
@@ -61,6 +89,21 @@ def _wallet_transaction_to_history_row(tx: WalletTransaction):
             "details": tx.details or f"{tx.get_tx_type_display()} {tx.asset}",
         },
     }
+
+
+def _record_wallet_transaction(*, wallet, user, tx_type, asset, amount, details, method='trade'):
+    safe_amount = abs(Decimal(str(amount or 0)))
+    if safe_amount <= 0:
+        return None
+    return WalletTransaction.objects.create(
+        wallet=wallet,
+        user=user,
+        tx_type=tx_type,
+        asset=(asset or 'USDT').upper().strip(),
+        amount=safe_amount,
+        method=(method or 'trade')[:120],
+        details=(details or '')[:255],
+    )
 
 
 def _create_trade_id():
@@ -488,6 +531,9 @@ class DashboardView(View):
     def get(self, request):
         if not request.user.is_authenticated:
             return redirect('login')
+        wallet = _ensure_wallet(request.user)
+        initial_usdt = wallet.get_asset_balance('USDT')
+        initial_btc = wallet.get_asset_balance('BTC')
         allowed_views = {
             "overview",
             "trade",
@@ -506,6 +552,8 @@ class DashboardView(View):
         return render(request, 'core/dashboard.html', {
             'COINAPI_API_KEY': getattr(settings, 'COINAPI_API_KEY', ''),
             'active_view': active_view,
+            'initial_usdt': initial_usdt,
+            'initial_btc': initial_btc,
         })
 
 
@@ -524,7 +572,12 @@ class DepositMethodsView(View):
     def get(self, request):
         if not request.user.is_authenticated:
             return redirect('login')
-        return render(request, 'core/deposit_methods.html')
+        wallet = _ensure_wallet(request.user)
+        return render(request, 'core/deposit_methods.html', {
+            'initial_usdt': wallet.balance,
+            'wallet_address': wallet.wallet_address,
+            'minimum_withdrawal_amount': MIN_WITHDRAWAL_AMOUNT,
+        })
 
 
 class LogoutView(View):
@@ -878,6 +931,112 @@ def deposit_simulate(request):
         return JsonResponse({"error": str(e)}, status=400)
 
 
+def withdrawal(request):
+    if request.method != "POST":
+        return JsonResponse(
+            {"error": "method_not_allowed", "message": "Withdrawal endpoint only accepts POST requests."},
+            status=405,
+        )
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized", "message": "Please log in to withdraw funds."}, status=401)
+
+    try:
+        import json
+
+        payload = {}
+        if request.body:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        elif request.POST:
+            payload = request.POST
+
+        raw_amount = payload.get("amount", 0)
+        destination_wallet_address = str(payload.get("wallet_address", "")).strip()
+
+        if not destination_wallet_address:
+            return JsonResponse(
+                {"error": "missing_wallet_address", "message": "Wallet address is required for withdrawal."},
+                status=400,
+            )
+        if not _is_valid_wallet_address(destination_wallet_address):
+            return JsonResponse(
+                {"error": "invalid_wallet_address", "message": "Please provide a valid wallet address."},
+                status=400,
+            )
+
+        try:
+            amount = Decimal(str(raw_amount))
+        except Exception:
+            return JsonResponse(
+                {"error": "invalid_amount", "message": "Withdrawal amount must be a valid number."},
+                status=400,
+            )
+
+        if amount <= 0:
+            return JsonResponse(
+                {"error": "invalid_amount", "message": "Withdrawal amount must be greater than zero."},
+                status=400,
+            )
+        if amount < MIN_WITHDRAWAL_AMOUNT:
+            return JsonResponse(
+                {
+                    "error": "amount_below_minimum",
+                    "message": f"Minimum withdrawal amount is {MIN_WITHDRAWAL_AMOUNT} USDT.",
+                },
+                status=400,
+            )
+
+        with transaction.atomic():
+            wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
+            if not _is_valid_wallet_address(wallet.wallet_address):
+                return JsonResponse(
+                    {
+                        "error": "invalid_profile_wallet_address",
+                        "message": "Your account wallet address is missing or invalid. Contact support.",
+                    },
+                    status=400,
+                )
+
+            if amount > wallet.balance:
+                return JsonResponse(
+                    {
+                        "error": "insufficient_balance",
+                        "message": "Insufficient balance for this withdrawal.",
+                        "available_balance": float(wallet.balance),
+                    },
+                    status=400,
+                )
+
+            wallet.balance -= amount
+            wallet.total_withdrawals += amount
+            wallet.save(update_fields=["balance", "total_withdrawals"])
+
+            tx = WalletTransaction.objects.create(
+                wallet=wallet,
+                user=request.user,
+                tx_type="withdrawal",
+                asset="USDT",
+                amount=amount,
+                method="wallet",
+                details=f"Withdrawal sent to {destination_wallet_address}",
+            )
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "message": "Withdrawal completed successfully.",
+                "wallet": WalletSerializer(wallet=wallet, user=request.user).data,
+                "transaction": WalletTransactionSerializer(tx).data,
+                "history_rows": _wallet_transaction_to_history_row(tx),
+            }
+        )
+    except Exception:
+        logger.error("Withdrawal failed: %s", traceback.format_exc())
+        return JsonResponse(
+            {"error": "withdrawal_failed", "message": "Unable to process withdrawal right now. Please try again."},
+            status=400,
+        )
+
+
 def margin_order(request):
     if request.method != "POST":
         return JsonResponse({"error": "method_not_allowed"}, status=405)
@@ -930,6 +1089,14 @@ def margin_order(request):
                 total_value=margin_required,
                 market_type="margin",
                 event_type="margin_open",
+            )
+            _record_wallet_transaction(
+                wallet=wallet,
+                user=request.user,
+                tx_type='margin_open',
+                asset='USDT',
+                amount=margin_required,
+                details=f"Margin {side.upper()} open {size} {_normalize_asset_symbol(symbol)} @ {price} ({leverage}x)",
             )
 
         return JsonResponse({
@@ -989,6 +1156,15 @@ def margin_close_all(request):
                     market_type='margin',
                     event_type='margin_close',
                 )
+                close_tx_type = 'margin_close' if released >= 0 else 'margin_close_loss'
+                _record_wallet_transaction(
+                    wallet=wallet,
+                    user=request.user,
+                    tx_type=close_tx_type,
+                    asset='USDT',
+                    amount=released,
+                    details=f"Margin close {position.side.upper()} {position.amount} {_normalize_asset_symbol(position.symbol)} @ {close_price}; PNL {pnl}",
+                )
                 closed_count += 1
 
             wallet.balance += total_released
@@ -1034,6 +1210,22 @@ def order(request):
                 wallet.save(update_fields=["balance"])
                 current_asset = wallet.get_asset_balance(asset_symbol)
                 wallet.set_asset_balance(asset_symbol, current_asset + size)
+                _record_wallet_transaction(
+                    wallet=wallet,
+                    user=request.user,
+                    tx_type='spot_buy_quote',
+                    asset='USDT',
+                    amount=total_value,
+                    details=f"Spot BUY quote debit for {size} {asset_symbol} @ {price}",
+                )
+                _record_wallet_transaction(
+                    wallet=wallet,
+                    user=request.user,
+                    tx_type='spot_buy_asset',
+                    asset=asset_symbol,
+                    amount=size,
+                    details=f"Spot BUY asset credit for {size} {asset_symbol} @ {price}",
+                )
 
             elif side == "sell":
                 current_asset = wallet.get_asset_balance(asset_symbol)
@@ -1043,6 +1235,22 @@ def order(request):
                 wallet.set_asset_balance(asset_symbol, current_asset - size)
                 wallet.balance += total_value
                 wallet.save(update_fields=["balance"])
+                _record_wallet_transaction(
+                    wallet=wallet,
+                    user=request.user,
+                    tx_type='spot_sell_asset',
+                    asset=asset_symbol,
+                    amount=size,
+                    details=f"Spot SELL asset debit for {size} {asset_symbol} @ {price}",
+                )
+                _record_wallet_transaction(
+                    wallet=wallet,
+                    user=request.user,
+                    tx_type='spot_sell_quote',
+                    asset='USDT',
+                    amount=total_value,
+                    details=f"Spot SELL quote credit for {size} {asset_symbol} @ {price}",
+                )
             else:
                 return JsonResponse({"error": "invalid_side"}, status=400)
 
@@ -1140,6 +1348,14 @@ def futures_order(request):
                 market_type="futures",
                 event_type="futures_open",
             )
+            _record_wallet_transaction(
+                wallet=wallet,
+                user=request.user,
+                tx_type='futures_open',
+                asset='USDT',
+                amount=margin_required,
+                details=f"Futures {side.upper()} open {size} {_normalize_asset_symbol(symbol)} @ {price} ({leverage}x)",
+            )
 
         return JsonResponse(
             {
@@ -1202,6 +1418,15 @@ def futures_close_all(request):
                     profit_loss=pnl,
                     market_type="futures",
                     event_type="futures_close",
+                )
+                close_tx_type = 'futures_close' if released >= 0 else 'futures_close_loss'
+                _record_wallet_transaction(
+                    wallet=wallet,
+                    user=request.user,
+                    tx_type=close_tx_type,
+                    asset='USDT',
+                    amount=released,
+                    details=f"Futures close {position.side.upper()} {position.amount} {_normalize_asset_symbol(position.symbol)} @ {close_price}; PNL {pnl}",
                 )
                 closed_count += 1
 

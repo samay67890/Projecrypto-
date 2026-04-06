@@ -8,7 +8,7 @@
     const userScope = userIdScope || userLabelScope;
     const STORAGE_KEY = `nexus.paper.state.v4.${userScope}`;
     const VIEW_STORAGE_KEY = `nexus.view.v1.${userScope}`;
-    const STARTING_USDT = Number(bootstrap.initialUSDT || 1000000);
+    const STARTING_USDT = Number.isFinite(Number(bootstrap.initialUSDT)) ? Number(bootstrap.initialUSDT) : 0;
     const BINANCE_API_BASE = "/api/binance";
     const COINGECKO_API_BASE = "/api/coingecko";
     const state = loadState();
@@ -41,10 +41,12 @@
     };
 
     initDebugGuards();
+    runUiSanityChecks();
     initViews();
     restoreActiveView();
     initMenu();
     initToggleButtons();
+    initMarginChartTabs();
     initIdentificationView();
     initSearch();
     initSpotTerminal();
@@ -66,6 +68,20 @@
         window.addEventListener("unhandledrejection", (event) => {
             reportError("unhandledrejection", event?.reason || "Unhandled promise rejection");
         });
+    }
+
+    function runUiSanityChecks() {
+        const missingViews = [];
+        document.querySelectorAll("[data-view]").forEach((el) => {
+            const view = String(el.getAttribute("data-view") || "").trim();
+            if (!view) return;
+            if (!document.getElementById(`view-${view}`)) {
+                missingViews.push(view);
+            }
+        });
+        if (missingViews.length) {
+            reportError("ui.sanity", `Missing view containers: ${[...new Set(missingViews)].join(", ")}`);
+        }
     }
 
     function ensureStatusBadge() {
@@ -144,6 +160,7 @@
         const priceNum = Number(trade?.price || 0);
         const amountNum = Number(trade?.amount || 0);
         const totalNum = Number(trade?.total_value || 0);
+        const realizedNum = Number(trade?.profit_loss || 0);
         const when = normalizeBackendTimestamp(trade?.timestamp);
         const orderType = marketType === "futures" ? "Futures" : (marketType === "margin" ? "Margin" : "Market");
         const txType = marketType === "futures" ? "Futures" : (marketType === "margin" ? "Margin" : "Trade");
@@ -168,6 +185,10 @@
                 executed: fmtAsset(amountNum),
                 fee: `${fmtAsset(amountNum * 0.001)} ${symbol}`,
                 total: `${fmtMoney(totalNum)} USDT`,
+                marketType,
+                eventType,
+                totalValue: totalNum,
+                profitLoss: realizedNum,
             },
             transaction: {
                 time: when,
@@ -533,7 +554,6 @@
         const groups = [
             { container: ".trade-tabs", item: ".tab" },
             { container: ".trade-mode", item: ".pill" },
-            { container: ".margin-chart-tabs .tabs-left", item: ".tab" },
         ];
         groups.forEach(({ container, item }) => {
             document.querySelectorAll(container).forEach((group) => {
@@ -546,6 +566,92 @@
                 });
             });
         });
+    }
+
+    function initMarginChartTabs() {
+        const tabButtons = Array.from(document.querySelectorAll(".margin-chart-tabs .tabs-left .tab[data-margin-tab]"));
+        const panels = Array.from(document.querySelectorAll(".margin-chart-wrap .margin-tab-panel[data-margin-panel]"));
+        if (!tabButtons.length || !panels.length) return;
+
+        const toolbar = document.querySelector(".margin-chart-toolbar");
+        const dataLink = qs("marginSquareDataLink");
+
+        const setTextSafe = (id, text) => {
+            const el = qs(id);
+            if (el) el.textContent = text;
+        };
+
+        const activateTab = (tabKey) => {
+            tabButtons.forEach((btn) => {
+                const isActive = btn.getAttribute("data-margin-tab") === tabKey;
+                btn.classList.toggle("active", isActive);
+            });
+            panels.forEach((panel) => {
+                const isActive = panel.getAttribute("data-margin-panel") === tabKey;
+                panel.classList.toggle("active", isActive);
+            });
+            if (toolbar) {
+                toolbar.style.display = tabKey === "chart" ? "" : "none";
+            }
+        };
+
+        const renderFromSnapshot = (snapshot) => {
+            if (!snapshot || typeof snapshot !== "object") return;
+
+            const usd = (value) => `$${fmtMoney(Number(value || 0))}`;
+            const selected = String(snapshot?.selectedCoin?.symbol || selectedCoin.symbol || "BTC").toUpperCase();
+            const wallet = snapshot?.wallet && typeof snapshot.wallet === "object" ? snapshot.wallet : {};
+            const usdtWallet = Number(wallet.USDT || 0);
+            const assetWallet = Number(wallet[selected] || snapshot?.spot?.quantity || 0);
+            const totalEquity = Number(snapshot.totalEquity || 0);
+            const earnValue = Number(snapshot?.earn?.value || 0);
+            const marginLocked = Number(snapshot?.margin?.locked || 0);
+            const futuresLocked = Number(snapshot?.futures?.locked || 0);
+            const marginPnl = Number(snapshot?.margin?.pnl || 0);
+            const futuresPnl = Number(snapshot?.futures?.pnl || 0);
+            const openPnl = marginPnl + futuresPnl;
+            const openPositions = (Array.isArray(snapshot?.margin?.positions) ? snapshot.margin.positions.length : 0)
+                + (Array.isArray(snapshot?.futures?.positions) ? snapshot.futures.positions.length : 0);
+
+            const last = Number(snapshot?.spot?.markPrice || lastPrice || 0);
+            const bestAsk = last > 0 ? last * 1.0002 : 0;
+            const bestBid = last > 0 ? last * 0.9998 : 0;
+            const spread = bestAsk > 0 && bestBid > 0 ? bestAsk - bestBid : 0;
+
+            setTextSafe("marginInfoWalletUsdt", usd(usdtWallet));
+            setTextSafe("marginInfoWalletAsset", `${assetWallet.toFixed(6)} ${selected}`);
+            setTextSafe("marginInfoEquity", usd(totalEquity));
+            setTextSafe("marginInfoEarn", usd(earnValue));
+
+            setTextSafe("marginTradingLocked", usd(marginLocked));
+            setTextSafe("marginTradingFutures", usd(futuresLocked));
+            setTextSafe("marginTradingPositions", String(openPositions));
+            setTextSafe("marginTradingOpenPnl", `${openPnl >= 0 ? "+" : "-"}${usd(Math.abs(openPnl))}`);
+
+            setTextSafe("marginSquareBestAsk", bestAsk > 0 ? usd(bestAsk) : "--");
+            setTextSafe("marginSquareBestBid", bestBid > 0 ? usd(bestBid) : "--");
+            setTextSafe("marginSquareSpread", spread > 0 ? usd(spread) : "--");
+            setTextSafe("marginSquareLast", usd(last));
+        };
+
+        tabButtons.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const tabKey = btn.getAttribute("data-margin-tab") || "chart";
+                activateTab(tabKey);
+            });
+        });
+
+        if (dataLink) {
+            dataLink.addEventListener("click", (event) => event.preventDefault());
+        }
+
+        document.addEventListener("nexus:portfolio:update", (event) => {
+            renderFromSnapshot(event.detail || null);
+        });
+
+        renderFromSnapshot(window.nexusPortfolioSnapshot || null);
+        const initialTab = tabButtons.find((btn) => btn.classList.contains("active"))?.getAttribute("data-margin-tab") || "chart";
+        activateTab(initialTab);
     }
 
     function initDepositNavigation() {
@@ -907,9 +1013,9 @@
                 updateMarginMetrics();
             });
         });
-        document.querySelectorAll("[data-margin-tab]").forEach((btn) => {
+        document.querySelectorAll(".margin-footer .footer-tabs [data-margin-tab]").forEach((btn) => {
             btn.addEventListener("click", () => {
-                document.querySelectorAll("[data-margin-tab]").forEach((b) => b.classList.remove("active"));
+                document.querySelectorAll(".margin-footer .footer-tabs [data-margin-tab]").forEach((b) => b.classList.remove("active"));
                 btn.classList.add("active");
                 const target = btn.getAttribute("data-margin-tab");
                 const openPanel = qs("marginOpenOrdersPanel");
@@ -1400,6 +1506,7 @@
             claimed: Number(state.earn.claimedTotal || 0),
         };
         state.earn.positions.forEach((p) => {
+            if (p.status !== "active") return;
             totals.principal += p.amount;
             const accrued = Math.max(0, calcEarnAccrued(p, nowMs));
             totals.accrued += accrued;
@@ -1930,7 +2037,9 @@
             if (symbol === "USDT") return sum;
             return sum + (Number(amount || 0) * getAssetMarkPrice(symbol));
         }, 0);
-        const equity = usdtBalance + spotAssetsValue + marginLocked + futuresLocked + calcOpenPnl();
+        const earnTotals = getEarnTotals(Date.now());
+        const earnValue = earnTotals.principal + earnTotals.claimable;
+        const equity = usdtBalance + spotAssetsValue + marginLocked + futuresLocked + calcOpenPnl() + earnValue;
         const pnl = equity - openingEquity;
         setText("estimatedAssets", `$${fmtMoney(equity)}`);
         const pnlEl = qs("todaysPnl");
@@ -1942,13 +2051,22 @@
         renderFuturesPositions();
         renderEarnPositions();
         renderMarginOrders();
-        publishOverviewData(equity, pnl, marginLocked, futuresLocked);
+        publishOverviewData(equity, pnl, marginLocked, futuresLocked, earnTotals);
     }
 
-    function publishOverviewData(equity, pnl, marginLocked, futuresLocked) {
+    function publishOverviewData(equity, pnl, marginLocked, futuresLocked, earnTotals) {
         const safeEquity = Number.isFinite(equity) ? equity : STARTING_USDT;
         const safePnl = Number.isFinite(pnl) ? pnl : 0;
         const selectedBalance = getWalletBalance(selectedCoin.symbol);
+        const safeEarnTotals = earnTotals || getEarnTotals(Date.now());
+        const marketPrices = {};
+        coinUniverse.forEach((coin) => {
+            const symbol = String(coin?.symbol || "").toUpperCase().trim();
+            const price = Number(coin?.price || 0);
+            if (!symbol || !Number.isFinite(price) || price <= 0) return;
+            marketPrices[symbol] = price;
+        });
+        marketPrices[selectedCoin.symbol] = Number(lastPrice || 0);
         const allSpotValue = Object.entries(state.wallet || {}).reduce((sum, [symbol, amount]) => {
             if (symbol === "USDT") return sum;
             return sum + (Number(amount || 0) * getAssetMarkPrice(symbol));
@@ -1998,11 +2116,19 @@
                     };
                 }),
             },
+            earn: {
+                principal: Number(safeEarnTotals.principal || 0),
+                accrued: Number(safeEarnTotals.accrued || 0),
+                claimable: Number(safeEarnTotals.claimable || 0),
+                claimed: Number(safeEarnTotals.claimed || 0),
+                value: Number(safeEarnTotals.principal || 0) + Number(safeEarnTotals.claimable || 0),
+            },
             history: {
                 orders: [...state.history.orders],
                 trades: [...state.history.trades],
                 transactions: [...state.history.transactions],
             },
+            marketPrices,
             selectedCoin: { ...selectedCoin },
             updatedAt: Date.now(),
         };

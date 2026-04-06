@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/orderbook/', views.orderbook, name='orderbook'),
     path('api/wallet/', views.wallet_data, name='wallet_data'),
     path('api/deposit/simulate/', views.deposit_simulate, name='deposit_simulate'),
+    path('withdraw/', views.withdrawal, name='withdrawal'),
     path('api/positions/', views.positions_data, name='positions_data'),
     path('api/portfolio/', views.portfolio_summary, name='portfolio_summary'),
     path('api/transactions/', views.transactions_data, name='transactions_data'),

@@ -16,6 +16,11 @@ const customInput = document.getElementById("customInput");
 const confirmAmountBtn = document.getElementById("confirmAmountBtn");
 const payNowBtn = document.getElementById("payNowBtn");
 const methodSearch = document.getElementById("methodSearch");
+const withdrawalForm = document.getElementById("withdrawalForm");
+const withdrawAmountInput = document.getElementById("withdrawAmount");
+const withdrawWalletAddressInput = document.getElementById("withdrawWalletAddress");
+const withdrawMessage = document.getElementById("withdrawMessage");
+const availableBalanceEl = document.getElementById("availableBalance");
 
 function getCookie(name) {
     let cookieValue = null;
@@ -108,6 +113,19 @@ function fmtMoney(value) {
     return Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function setAvailableBalance(value) {
+    if (!availableBalanceEl) return;
+    availableBalanceEl.textContent = fmtMoney(value || 0);
+}
+
+function setWithdrawMessage(message, isSuccess) {
+    if (!withdrawMessage) return;
+    withdrawMessage.textContent = message || "";
+    withdrawMessage.classList.remove("success", "error");
+    if (!message) return;
+    withdrawMessage.classList.add(isSuccess ? "success" : "error");
+}
+
 async function syncDepositToLocalState(payload) {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -164,7 +182,61 @@ async function recordDepositTransaction() {
     if (!response.ok) {
         throw new Error(payload?.message || payload?.error || "Deposit failed");
     }
+    const newUsdt = payload?.wallet?.wallet?.usdt ?? payload?.wallet?.usdt;
+    if (typeof newUsdt === "number") {
+        setAvailableBalance(newUsdt);
+    }
     await syncDepositToLocalState(payload);
+}
+
+async function submitWithdrawal(event) {
+    event.preventDefault();
+    setWithdrawMessage("", false);
+
+    const amount = Number(withdrawAmountInput?.value || 0);
+    const destinationWalletAddress = String(withdrawWalletAddressInput?.value || "").trim();
+    const minWithdrawalAmount = Number(bootstrap.minWithdrawalAmount || 10);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+        setWithdrawMessage("Please enter a valid withdrawal amount.", false);
+        return;
+    }
+    if (amount < minWithdrawalAmount) {
+        setWithdrawMessage(`Minimum withdrawal amount is ${minWithdrawalAmount} USDT.`, false);
+        return;
+    }
+    if (!destinationWalletAddress) {
+        setWithdrawMessage("Wallet address is required for withdrawal.", false);
+        return;
+    }
+
+    try {
+        const response = await fetch("/withdraw/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({
+                amount,
+                wallet_address: destinationWalletAddress,
+            }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+            setWithdrawMessage(payload?.message || payload?.error || "Withdrawal failed.", false);
+            return;
+        }
+
+        const newUsdt = payload?.wallet?.wallet?.usdt ?? payload?.wallet?.usdt;
+        if (typeof newUsdt === "number") {
+            setAvailableBalance(newUsdt);
+        }
+        withdrawAmountInput.value = "";
+        setWithdrawMessage(payload?.message || "Withdrawal completed successfully.", true);
+    } catch (error) {
+        setWithdrawMessage(error?.message || "Unable to process withdrawal right now.", false);
+    }
 }
 
 document.querySelectorAll(".method-card").forEach((card) => {
@@ -220,4 +292,9 @@ if (methodSearch) {
             card.style.display = label.includes(query) ? "" : "none";
         });
     });
+}
+
+if (withdrawalForm) {
+    withdrawalForm.addEventListener("submit", submitWithdrawal);
+    setAvailableBalance(bootstrap.initialUSDT || 0);
 }
