@@ -20,7 +20,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
 from accounts.models import OTP
-from accounts.models import Position, Wallet, WalletTransaction, Trade
+from accounts.models import LedgerEntry, Position, Wallet, WalletTransaction, Trade
 from core.serializers import (
     PortfolioSummarySerializer,
     PositionSerializer,
@@ -33,6 +33,8 @@ from core.email_service import send_otp_email
 User = get_user_model()
 logger = logging.getLogger(__name__)
 MIN_WITHDRAWAL_AMOUNT = Decimal("10")
+WITHDRAWAL_FEE = Decimal("1")  # flat 1 USDT fee per withdrawal
+TRADING_FEE_RATE = Decimal("0.001")  # 0.1% maker/taker fee
 WALLET_ADDRESS_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9\-_]{5,254}$")
 
 
@@ -91,18 +93,92 @@ def _wallet_transaction_to_history_row(tx: WalletTransaction):
     }
 
 
-def _record_wallet_transaction(*, wallet, user, tx_type, asset, amount, details, method='trade'):
+def _record_wallet_transaction(*, wallet, user, tx_type, asset, amount, details, method='trade', fee=Decimal('0')):
     safe_amount = abs(Decimal(str(amount or 0)))
     if safe_amount <= 0:
         return None
-    return WalletTransaction.objects.create(
+    safe_fee = abs(Decimal(str(fee or 0)))
+    tx = WalletTransaction.objects.create(
         wallet=wallet,
         user=user,
         tx_type=tx_type,
         asset=(asset or 'USDT').upper().strip(),
         amount=safe_amount,
+        fee=safe_fee,
         method=(method or 'trade')[:120],
         details=(details or '')[:255],
+    )
+    # Create double-entry ledger pair for this transaction.
+    _record_ledger_pair(wallet=wallet, tx=tx, tx_type=tx_type, asset=tx.asset, amount=safe_amount)
+    return tx
+
+
+def _record_ledger_pair(*, wallet, tx, tx_type, asset, amount):
+    """Create a debit/credit ledger entry pair for a given wallet transaction.
+    Debit = funds leaving the wallet, Credit = funds entering the wallet."""
+    credit_types = {
+        'deposit', 'spot_buy_asset', 'spot_sell_quote',
+        'margin_close', 'futures_close',
+    }
+    debit_types = {
+        'withdrawal', 'spot_buy_quote', 'spot_sell_asset',
+        'margin_open', 'margin_close_loss',
+        'futures_open', 'futures_close_loss',
+        'trading_fee', 'withdrawal_fee',
+    }
+    if tx_type in credit_types:
+        entry_type = 'credit'
+    elif tx_type in debit_types:
+        entry_type = 'debit'
+    else:
+        return  # unknown type, skip ledger
+
+    balance_after = wallet.get_asset_balance(asset)
+
+    # User-side entry
+    user_entry = LedgerEntry.objects.create(
+        wallet=wallet,
+        entry_type=entry_type,
+        asset=asset,
+        amount=amount,
+        balance_after=balance_after,
+        reference_tx=tx,
+        description=tx.details or f"{tx.get_tx_type_display()} {asset}",
+    )
+
+    # Platform-side contra entry (opposite direction, recorded on same wallet for simplicity
+    # — a production system would use a separate platform wallet).
+    contra_type = 'credit' if entry_type == 'debit' else 'debit'
+    contra_entry = LedgerEntry.objects.create(
+        wallet=wallet,
+        entry_type=contra_type,
+        asset=asset,
+        amount=amount,
+        balance_after=balance_after,
+        reference_tx=tx,
+        counterpart=user_entry,
+        description=f"[PLATFORM] {tx.details or tx.get_tx_type_display()}",
+    )
+    user_entry.counterpart = contra_entry
+    user_entry.save(update_fields=['counterpart'])
+
+
+def _charge_fee(*, wallet, user, fee_amount, fee_type='trading_fee', details=''):
+    """Deduct a fee from the wallet and record it as a WalletTransaction + LedgerEntry."""
+    safe_fee = abs(Decimal(str(fee_amount or 0)))
+    if safe_fee <= 0:
+        return None
+    wallet.balance -= safe_fee
+    wallet.total_fees_paid += safe_fee
+    wallet.save(update_fields=['balance', 'total_fees_paid'])
+    return _record_wallet_transaction(
+        wallet=wallet,
+        user=user,
+        tx_type=fee_type,
+        asset='USDT',
+        amount=safe_fee,
+        details=(details or f"Fee: {safe_fee} USDT")[:255],
+        method='fee',
     )
 
 
@@ -115,7 +191,7 @@ def _create_trade_id():
     return trade_id
 
 
-def _record_trade(*, user, coin, side, price, amount, total_value, market_type, event_type, profit_loss=Decimal("0")):
+def _record_trade(*, user, coin, side, price, amount, total_value, market_type, event_type, profit_loss=Decimal("0"), fee=Decimal("0")):
     return Trade.objects.create(
         user=user,
         trade_id=_create_trade_id(),
@@ -124,6 +200,7 @@ def _record_trade(*, user, coin, side, price, amount, total_value, market_type, 
         price=price,
         amount=amount,
         total_value=total_value,
+        fee=fee,
         profit_loss=profit_loss,
         market_type=market_type,
         event_type=event_type,
@@ -996,11 +1073,12 @@ def withdrawal(request):
                     status=400,
                 )
 
-            if amount > wallet.balance:
+            total_debit = amount + WITHDRAWAL_FEE
+            if total_debit > wallet.balance:
                 return JsonResponse(
                     {
                         "error": "insufficient_balance",
-                        "message": "Insufficient balance for this withdrawal.",
+                        "message": f"Insufficient balance. You need {total_debit} USDT ({amount} + {WITHDRAWAL_FEE} fee).",
                         "available_balance": float(wallet.balance),
                     },
                     status=400,
@@ -1010,14 +1088,24 @@ def withdrawal(request):
             wallet.total_withdrawals += amount
             wallet.save(update_fields=["balance", "total_withdrawals"])
 
-            tx = WalletTransaction.objects.create(
+            tx = _record_wallet_transaction(
                 wallet=wallet,
                 user=request.user,
-                tx_type="withdrawal",
-                asset="USDT",
+                tx_type='withdrawal',
+                asset='USDT',
                 amount=amount,
-                method="wallet",
+                fee=WITHDRAWAL_FEE,
+                method='wallet',
                 details=f"Withdrawal sent to {destination_wallet_address}",
+            )
+
+            # Charge the withdrawal fee separately
+            _charge_fee(
+                wallet=wallet,
+                user=request.user,
+                fee_amount=WITHDRAWAL_FEE,
+                fee_type='withdrawal_fee',
+                details=f"Withdrawal fee for TX {tx.reference if tx else 'N/A'}",
             )
 
         return JsonResponse(
@@ -1058,12 +1146,15 @@ def margin_order(request):
             return JsonResponse({"error": "invalid_parameters"}, status=400)
 
         margin_required = (price * size) / leverage
+        notional = price * size
+        trading_fee = (notional * TRADING_FEE_RATE).quantize(Decimal("0.00000001"))
 
         with transaction.atomic():
             wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
-            if wallet.balance < margin_required:
+            total_cost = margin_required + trading_fee
+            if wallet.balance < total_cost:
                 return JsonResponse(
-                    {"error": "insufficient_balance", "required": float(margin_required), "available": float(wallet.balance)},
+                    {"error": "insufficient_balance", "required": float(total_cost), "available": float(wallet.balance)},
                     status=400,
                 )
             wallet.balance -= margin_required
@@ -1087,6 +1178,7 @@ def margin_order(request):
                 price=price,
                 amount=size,
                 total_value=margin_required,
+                fee=trading_fee,
                 market_type="margin",
                 event_type="margin_open",
             )
@@ -1096,7 +1188,16 @@ def margin_order(request):
                 tx_type='margin_open',
                 asset='USDT',
                 amount=margin_required,
+                fee=trading_fee,
                 details=f"Margin {side.upper()} open {size} {_normalize_asset_symbol(symbol)} @ {price} ({leverage}x)",
+            )
+            # Charge trading fee
+            _charge_fee(
+                wallet=wallet,
+                user=request.user,
+                fee_amount=trading_fee,
+                fee_type='trading_fee',
+                details=f"Margin open fee (0.1%) on {size} {_normalize_asset_symbol(symbol)} @ {price} ({leverage}x)",
             )
 
         return JsonResponse({
@@ -1104,6 +1205,7 @@ def margin_order(request):
             "trade": TradeSerializer(trade).data,
             "position": PositionSerializer(position).data,
             "new_usdt": float(wallet.balance),
+            "fee": float(trading_fee),
         })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
@@ -1201,10 +1303,12 @@ def order(request):
         with transaction.atomic():
             wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
             total_value = price * size
+            trading_fee = (total_value * TRADING_FEE_RATE).quantize(Decimal("0.00000001"))
 
             if side == "buy":
-                if wallet.balance < total_value:
-                    return JsonResponse({"error": "insufficient_balance", "required": float(total_value), "available": float(wallet.balance)}, status=400)
+                total_cost = total_value + trading_fee
+                if wallet.balance < total_cost:
+                    return JsonResponse({"error": "insufficient_balance", "required": float(total_cost), "available": float(wallet.balance)}, status=400)
 
                 wallet.balance -= total_value
                 wallet.save(update_fields=["balance"])
@@ -1216,6 +1320,7 @@ def order(request):
                     tx_type='spot_buy_quote',
                     asset='USDT',
                     amount=total_value,
+                    fee=trading_fee,
                     details=f"Spot BUY quote debit for {size} {asset_symbol} @ {price}",
                 )
                 _record_wallet_transaction(
@@ -1226,6 +1331,14 @@ def order(request):
                     amount=size,
                     details=f"Spot BUY asset credit for {size} {asset_symbol} @ {price}",
                 )
+                # Charge trading fee
+                _charge_fee(
+                    wallet=wallet,
+                    user=request.user,
+                    fee_amount=trading_fee,
+                    fee_type='trading_fee',
+                    details=f"Spot BUY fee (0.1%) on {size} {asset_symbol} @ {price}",
+                )
 
             elif side == "sell":
                 current_asset = wallet.get_asset_balance(asset_symbol)
@@ -1233,7 +1346,8 @@ def order(request):
                     return JsonResponse({"error": "insufficient_crypto", "required": float(size), "available": float(current_asset)}, status=400)
 
                 wallet.set_asset_balance(asset_symbol, current_asset - size)
-                wallet.balance += total_value
+                proceeds = total_value - trading_fee
+                wallet.balance += proceeds
                 wallet.save(update_fields=["balance"])
                 _record_wallet_transaction(
                     wallet=wallet,
@@ -1248,25 +1362,29 @@ def order(request):
                     user=request.user,
                     tx_type='spot_sell_quote',
                     asset='USDT',
-                    amount=total_value,
-                    details=f"Spot SELL quote credit for {size} {asset_symbol} @ {price}",
+                    amount=proceeds,
+                    fee=trading_fee,
+                    details=f"Spot SELL quote credit for {size} {asset_symbol} @ {price} (net of {trading_fee} fee)",
+                )
+                # Charge trading fee
+                _charge_fee(
+                    wallet=wallet,
+                    user=request.user,
+                    fee_amount=trading_fee,
+                    fee_type='trading_fee',
+                    details=f"Spot SELL fee (0.1%) on {size} {asset_symbol} @ {price}",
                 )
             else:
                 return JsonResponse({"error": "invalid_side"}, status=400)
 
-            import uuid
-            trade_id = str(uuid.uuid4())[:8]
-            while Trade.objects.filter(trade_id=trade_id).exists():
-                trade_id = str(uuid.uuid4())[:8]
-
-            trade = Trade.objects.create(
+            trade = _record_trade(
                 user=request.user,
-                trade_id=trade_id,
                 coin=symbol,
                 side=side.capitalize(),
                 price=price,
                 amount=size,
                 total_value=total_value,
+                fee=trading_fee,
                 market_type="spot",
                 event_type="spot_fill",
             )
@@ -1276,6 +1394,7 @@ def order(request):
             "side": side,
             "price": float(price),
             "size": float(size),
+            "fee": float(trading_fee),
             "trade_id": trade.trade_id,
             "user_id": request.user.id,
             "user_email": request.user.email,
@@ -1309,14 +1428,17 @@ def futures_order(request):
             return JsonResponse({"error": "invalid_parameters"}, status=400)
 
         margin_required = (price * size) / leverage
+        notional = price * size
+        trading_fee = (notional * TRADING_FEE_RATE).quantize(Decimal("0.00000001"))
 
         with transaction.atomic():
             wallet, _ = Wallet.objects.select_for_update().get_or_create(user=request.user)
-            if wallet.balance < margin_required:
+            total_cost = margin_required + trading_fee
+            if wallet.balance < total_cost:
                 return JsonResponse(
                     {
                         "error": "insufficient_balance",
-                        "required": float(margin_required),
+                        "required": float(total_cost),
                         "available": float(wallet.balance),
                     },
                     status=400,
@@ -1345,6 +1467,7 @@ def futures_order(request):
                 price=price,
                 amount=size,
                 total_value=margin_required,
+                fee=trading_fee,
                 market_type="futures",
                 event_type="futures_open",
             )
@@ -1354,7 +1477,16 @@ def futures_order(request):
                 tx_type='futures_open',
                 asset='USDT',
                 amount=margin_required,
+                fee=trading_fee,
                 details=f"Futures {side.upper()} open {size} {_normalize_asset_symbol(symbol)} @ {price} ({leverage}x)",
+            )
+            # Charge trading fee
+            _charge_fee(
+                wallet=wallet,
+                user=request.user,
+                fee_amount=trading_fee,
+                fee_type='trading_fee',
+                details=f"Futures open fee (0.1%) on {size} {_normalize_asset_symbol(symbol)} @ {price} ({leverage}x)",
             )
 
         return JsonResponse(
@@ -1364,6 +1496,7 @@ def futures_order(request):
                 "position": PositionSerializer(position).data,
                 "new_usdt": float(wallet.balance),
                 "locked_margin": float(margin_required),
+                "fee": float(trading_fee),
                 "user_id": request.user.id,
                 "user_email": request.user.email,
             }

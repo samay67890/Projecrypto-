@@ -35,6 +35,7 @@ class WalletSerializer:
                 "wallet_address": self.wallet.wallet_address,
                 "total_deposits": float(self.wallet.total_deposits),
                 "total_withdrawals": float(self.wallet.total_withdrawals),
+                "total_fees_paid": float(self.wallet.total_fees_paid),
             },
             "user": {
                 "id": self.user.id,
@@ -67,6 +68,7 @@ class TradeSerializer:
             "price": _to_decimal_string(self.trade.price),
             "amount": _to_decimal_string(self.trade.amount),
             "total_value": _to_decimal_string(self.trade.total_value),
+            "fee": _to_decimal_string(getattr(self.trade, 'fee', 0)),
             "profit_loss": _to_decimal_string(self.trade.profit_loss),
             "timestamp": self.trade.timestamp.isoformat() if self.trade.timestamp else None,
         }
@@ -84,6 +86,7 @@ class WalletTransactionSerializer:
             "tx_type": self.tx.tx_type,
             "asset": self.tx.asset,
             "amount": _to_decimal_string(self.tx.amount),
+            "fee": _to_decimal_string(getattr(self.tx, 'fee', 0)),
             "method": self.tx.method,
             "status": self.tx.status,
             "details": self.tx.details,

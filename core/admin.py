@@ -796,15 +796,100 @@ class PlatformSettingsAdmin(admin.ModelAdmin):
         return safe_value(obj, "withdrawal_limit")
 
 
+def get_ledger_entry_model():
+    return get_model_by_name("LedgerEntry")
+
+
+class LedgerEntryAdmin(admin.ModelAdmin):
+    list_display = ("entry_type_col", "wallet_col", "asset_col", "amount_col", "balance_after_col", "reference_col", "created_at_col")
+    ordering = ("-id",)
+    list_filter = ("entry_type", "asset", "created_at")
+    search_fields = ("wallet__user__email", "description", "reference_tx__reference")
+
+    @admin.display(description="Type", ordering="entry_type")
+    def entry_type_col(self, obj):
+        return obj.entry_type.upper()
+
+    @admin.display(description="Wallet")
+    def wallet_col(self, obj):
+        return str(obj.wallet)
+
+    @admin.display(description="Asset")
+    def asset_col(self, obj):
+        return obj.asset
+
+    @admin.display(description="Amount")
+    def amount_col(self, obj):
+        return obj.amount
+
+    @admin.display(description="Balance After")
+    def balance_after_col(self, obj):
+        return obj.balance_after
+
+    @admin.display(description="Reference TX")
+    def reference_col(self, obj):
+        return obj.reference_tx.reference if obj.reference_tx else "-"
+
+    @admin.display(description="Created At", ordering="created_at")
+    def created_at_col(self, obj):
+        return obj.created_at
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class WalletTransactionFullAdmin(admin.ModelAdmin):
+    list_display = ("reference_col", "user_col", "tx_type_col", "asset_col", "amount_col", "fee_col", "status_col", "created_at_col")
+    ordering = ("-id",)
+    list_filter = ("tx_type", "status", "asset", "created_at")
+    search_fields = ("reference", "user__email", "details")
+
+    @admin.display(description="Reference", ordering="reference")
+    def reference_col(self, obj):
+        return obj.reference
+
+    @admin.display(description="User")
+    def user_col(self, obj):
+        return obj.user.email if obj.user else "-"
+
+    @admin.display(description="Type")
+    def tx_type_col(self, obj):
+        return obj.get_tx_type_display()
+
+    @admin.display(description="Asset")
+    def asset_col(self, obj):
+        return obj.asset
+
+    @admin.display(description="Amount")
+    def amount_col(self, obj):
+        return obj.amount
+
+    @admin.display(description="Fee")
+    def fee_col(self, obj):
+        return obj.fee if obj.fee else Decimal("0")
+
+    @admin.display(description="Status")
+    def status_col(self, obj):
+        return obj.status.capitalize()
+
+    @admin.display(description="Created At", ordering="created_at")
+    def created_at_col(self, obj):
+        return obj.created_at
+
+
 User = get_user_model()
 register_or_replace(User, UserControlAdmin)
 register_or_replace(get_model_by_name("OTP"), OTPAdmin)
 register_or_replace(get_kyc_model(), KYCAdmin)
 register_or_replace(get_wallet_model(), WalletAdmin)
-register_or_replace(get_model_by_name("Transaction") or get_wallet_transaction_model(), TransactionAdmin)
+register_or_replace(get_wallet_transaction_model(), WalletTransactionFullAdmin)
 register_or_replace(get_trade_model(), TradeAdmin)
 register_or_replace(get_wallet_asset_model(), WalletAssetAdmin)
 register_or_replace(get_position_model(), PositionAdmin)
+register_or_replace(get_ledger_entry_model(), LedgerEntryAdmin)
 register_or_replace(get_model_by_name("CryptoCoin"), CryptoCoinAdmin)
 register_or_replace(get_model_by_name("SecurityLog"), SecurityLogAdmin)
 register_or_replace(get_model_by_name("PlatformSettings"), PlatformSettingsAdmin)

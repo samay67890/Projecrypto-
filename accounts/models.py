@@ -59,6 +59,7 @@ class Wallet(models.Model):
     btc_balance = models.DecimalField(max_digits=30, decimal_places=8, default=0.00, help_text="Secondary BTC Balance")
     total_deposits = models.DecimalField(max_digits=30, decimal_places=8, default=0.00)
     total_withdrawals = models.DecimalField(max_digits=30, decimal_places=8, default=0.00)
+    total_fees_paid = models.DecimalField(max_digits=30, decimal_places=8, default=0.00, help_text="Cumulative trading/withdrawal fees paid by this user")
 
     def __str__(self):
         return f"{self.user.email} Wallet"
@@ -135,6 +136,8 @@ class WalletTransaction(models.Model):
         ('futures_open', 'Futures Open (USDT Debit)'),
         ('futures_close', 'Futures Close (USDT Credit)'),
         ('futures_close_loss', 'Futures Close (USDT Debit)'),
+        ('trading_fee', 'Trading Fee'),
+        ('withdrawal_fee', 'Withdrawal Fee'),
     )
     STATUS_CHOICES = (
         ('completed', 'Completed'),
@@ -148,6 +151,7 @@ class WalletTransaction(models.Model):
     tx_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
     asset = models.CharField(max_length=20, default='USDT')
     amount = models.DecimalField(max_digits=30, decimal_places=8)
+    fee = models.DecimalField(max_digits=30, decimal_places=8, default=0.00, help_text="Fee charged for this transaction")
     method = models.CharField(max_length=120, blank=True, default='')
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='completed')
     details = models.CharField(max_length=255, blank=True, default='')
@@ -168,6 +172,47 @@ class WalletTransaction(models.Model):
 
     def __str__(self):
         return f"{self.get_tx_type_display()} {self.amount} {self.asset}"
+
+
+class LedgerEntry(models.Model):
+    """Double-entry ledger row. Every fund movement creates TWO entries (debit + credit)
+    so the total across all wallets always nets to zero."""
+    ENTRY_TYPES = (
+        ('debit', 'Debit'),
+        ('credit', 'Credit'),
+    )
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='ledger_entries')
+    entry_type = models.CharField(max_length=10, choices=ENTRY_TYPES)
+    asset = models.CharField(max_length=20, default='USDT')
+    amount = models.DecimalField(max_digits=30, decimal_places=8, help_text="Always positive; direction indicated by entry_type")
+    balance_after = models.DecimalField(max_digits=30, decimal_places=8, help_text="Wallet balance in this asset after this entry")
+    reference_tx = models.ForeignKey(
+        WalletTransaction, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='ledger_entries', help_text="The WalletTransaction that triggered this entry",
+    )
+    counterpart = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='paired_entry', help_text="The other half of this double-entry pair",
+    )
+    description = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['wallet', 'asset', 'created_at']),
+            models.Index(fields=['entry_type', 'created_at']),
+        ]
+        verbose_name = 'Ledger Entry'
+        verbose_name_plural = 'Ledger Entries'
+
+    def save(self, *args, **kwargs):
+        self.asset = (self.asset or 'USDT').upper().strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.entry_type.upper()} {self.amount} {self.asset} → {self.wallet.user.email}"
+
 
 class Trade(models.Model):
     SIDE_CHOICES = (
@@ -197,6 +242,7 @@ class Trade(models.Model):
     price = models.DecimalField(max_digits=30, decimal_places=8)
     amount = models.DecimalField(max_digits=30, decimal_places=8)
     total_value = models.DecimalField(max_digits=30, decimal_places=8, help_text="price * amount")
+    fee = models.DecimalField(max_digits=30, decimal_places=8, default=0.00, help_text="Trading fee charged (in USDT)")
     profit_loss = models.DecimalField(max_digits=30, decimal_places=8, default=0.00)
     market_type = models.CharField(max_length=20, choices=MARKET_TYPE_CHOICES, default="spot", help_text="spot or futures")
     event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES, default="spot_fill", help_text="spot_fill, futures_open, futures_close")
