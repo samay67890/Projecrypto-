@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.conf import settings
 
 
 class User(AbstractUser):
@@ -12,6 +13,31 @@ class User(AbstractUser):
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
+
+
+class SocialAccount(models.Model):
+    """Links a user to an external OAuth provider (e.g., Google)."""
+    PROVIDER_CHOICES = (
+        ('google', 'Google'),
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='social_accounts')
+    provider = models.CharField(max_length=30, choices=PROVIDER_CHOICES)
+    provider_uid = models.CharField(max_length=255, help_text="Provider unique user ID (Google 'sub' claim)")
+    email = models.EmailField(help_text="Email from the OAuth provider")
+    display_name = models.CharField(max_length=255, blank=True, default='')
+    avatar_url = models.URLField(max_length=500, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('provider', 'provider_uid')
+        indexes = [
+            models.Index(fields=['provider', 'email']),
+        ]
+        verbose_name = 'Social Account'
+        verbose_name_plural = 'Social Accounts'
+
+    def __str__(self):
+        return f"{self.user.email} — {self.get_provider_display()}"
 
 
 class OTP(models.Model):
@@ -120,6 +146,27 @@ class WalletAsset(models.Model):
 
     def __str__(self):
         return f"{self.wallet.user.email} {self.symbol}"
+
+
+class KYC(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='kyc')
+    document_type = models.CharField(max_length=50, choices=(
+        ('id_card', 'ID Card'),
+        ('passport', 'Passport'),
+        ('drivers_license', "Driver's License")
+    ))
+    document_image = models.ImageField(upload_to='kyc_documents/')
+    status = models.CharField(max_length=20, default='pending', choices=(
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected')
+    ))
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.email} - KYC: {self.status}"
+
 
 
 class WalletTransaction(models.Model):

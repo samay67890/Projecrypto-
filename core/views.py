@@ -20,7 +20,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
 from accounts.models import OTP
-from accounts.models import LedgerEntry, Position, Wallet, WalletTransaction, Trade
+from accounts.models import LedgerEntry, Position, Wallet, WalletTransaction, Trade, KYC, SocialAccount
 from core.serializers import (
     PortfolioSummarySerializer,
     PositionSerializer,
@@ -663,12 +663,306 @@ class LogoutView(View):
     def post(self, request):
         auth_logout(request)
         return redirect('login')
+
+
+# ──────────────────────────────────────────────
+# Auth0 OAuth 2.0 — Sign-In
+# ──────────────────────────────────────────────
+from authlib.integrations.django_client import OAuth
+from django.urls import reverse
+
+oauth = OAuth()
+oauth.register(
+    "auth0",
+    client_id=getattr(settings, 'AUTH0_CLIENT_ID', ''),
+    client_secret=getattr(settings, 'AUTH0_CLIENT_SECRET', ''),
+    client_kwargs={
+        "scope": "openid profile email",
+    },
+    server_metadata_url=f"https://{getattr(settings, 'AUTH0_DOMAIN', '')}/.well-known/openid-configuration",
+)
+
+
+def auth0_login(request):
+    """Redirects the user straight to Google via Auth0."""
+    redirect_uri = request.build_absolute_uri(reverse('auth0_callback'))
+    return oauth.auth0.authorize_redirect(request, redirect_uri, connection='google-oauth2')
+
+
+def auth0_callback(request):
+    """Receives Auth0 token, verifies, and routes:
+    1. SocialAccount exists → login + OTP verification
+    2. Email matches existing user → Authorization / Link-Account page
+    3. Brand-new user → create account + OTP verification
+    """
+    try:
+        token = oauth.auth0.authorize_access_token(request)
+        userinfo = token.get('userinfo')
+    except Exception as exc:
+        logger.error("Auth0 token verification failed: %s", exc)
+        return render(request, 'core/login.html', {
+            'error': 'Could not verify your account. Please try again.',
+        })
+
+    if not userinfo:
+        return render(request, 'core/login.html', {
+            'error': 'Authentication server did not provide account info.',
+        })
+
+    auth0_email = (userinfo.get('email') or '').strip().lower()
+    auth0_sub = userinfo.get('sub', '')
+    auth0_name = userinfo.get('name', '')
+    auth0_picture = userinfo.get('picture', '')
+
+    if not auth0_email or not auth0_sub:
+        return render(request, 'core/login.html', {
+            'error': 'Auth0 did not provide required account info (email/sub).',
+        })
+
+    # ── SCENARIO 1: SocialAccount already linked → instant login + OTP ──
+    social = SocialAccount.objects.filter(provider='auth0', provider_uid=auth0_sub).first()
+    if social:
+        user = social.user
+        if not user.is_active:
+            return render(request, 'core/signin.html', {
+                'error': 'This account is inactive. Please contact support.',
+            })
+        # Store user info in session, send OTP, redirect to OTP verification
+        request.session['auth0_login_user_id'] = user.pk
+        request.session['auth0_login_email'] = auth0_email
+        code = _create_otp_for_email(auth0_email)
+        send_otp_email(auth0_email, code)
+        return redirect('auth0_verify_otp')
+
+    # ── SCENARIO 2: Email matches existing user but NOT linked → Authorization page ──
+    existing_user = User.objects.filter(email__iexact=auth0_email).first()
+    if existing_user:
+        # Store Auth0 data in session for the link-account page
+        request.session['auth0_link_data'] = {
+            'sub': auth0_sub,
+            'email': auth0_email,
+            'name': auth0_name,
+            'picture': auth0_picture,
+        }
+        request.session['auth0_link_user_id'] = existing_user.pk
+        return redirect('auth0_link_account')
+
+    # ── SCENARIO 3: Brand-new user → create account + OTP ──
+    with transaction.atomic():
+        user = User.objects.create_user(
+            email=auth0_email,
+            username=auth0_email,
+            password=None,  # No password — Auth0-only user
+        )
+        user.set_unusable_password()
+        user.save()
+        _ensure_wallet(user)
+        SocialAccount.objects.create(
+            user=user,
+            provider='auth0',
+            provider_uid=auth0_sub,
+            email=auth0_email,
+            display_name=auth0_name,
+            avatar_url=auth0_picture,
+        )
+
+    # Send OTP for first-time verification (crypto security)
+    request.session['auth0_login_user_id'] = user.pk
+    request.session['auth0_login_email'] = auth0_email
+    request.session['auth0_new_user'] = True
+    code = _create_otp_for_email(auth0_email)
+    send_otp_email(auth0_email, code)
+    return redirect('auth0_verify_otp')
+
+
+class Auth0VerifyOtpView(View):
+    """OTP verification after Auth0 login (both new and existing users)."""
+
+    def get(self, request):
+        email = request.session.get('auth0_login_email')
+        user_id = request.session.get('auth0_login_user_id')
+        if not email or not user_id:
+            return redirect('login')
+        return render(request, 'core/signup/verify_otp.html', {
+            'email': email,
+            'auth0_otp': True,  # flag to adjust the template messaging
+        })
+
+    def post(self, request):
+        email = request.session.get('auth0_login_email')
+        user_id = request.session.get('auth0_login_user_id')
+        if not email or not user_id:
+            return redirect('login')
+
+        otp_value = (request.POST.get('otp') or '').strip()
+        if len(otp_value) != 6 or not otp_value.isdigit():
+            return render(request, 'core/signup/verify_otp.html', {
+                'email': email,
+                'auth0_otp': True,
+                'error': 'Please enter a valid 6-digit code.',
+            })
+
+        # Rate-limit OTP attempts
+        otp_attempts = request.session.get('auth0_otp_attempts', 0)
+        if otp_attempts >= 5:
+            return render(request, 'core/signup/verify_otp.html', {
+                'email': email,
+                'auth0_otp': True,
+                'error': 'Too many failed OTP attempts. Please request a new code.',
+            })
+
+        # Verify OTP
+        now = timezone.now()
+        otp_record = (
+            OTP.objects.filter(email=email, is_used=False, expires_at__gt=now)
+            .order_by('-created_at')
+            .first()
+        )
+
+        if not otp_record or not check_password(otp_value, otp_record.otp_hash):
+            request.session['auth0_otp_attempts'] = otp_attempts + 1
+            remaining = 5 - (otp_attempts + 1)
+            return render(request, 'core/signup/verify_otp.html', {
+                'email': email,
+                'auth0_otp': True,
+                'error': f'Invalid or expired code. {remaining} attempt(s) remaining.',
+            })
+
+        # OTP verified — mark used
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return redirect('login')
+
+        otp_record.user = user
+        otp_record.is_used = True
+        otp_record.save(update_fields=['user', 'is_used'])
+
+        # Clean up session
+        for key in ('auth0_login_user_id', 'auth0_login_email', 'auth0_otp_attempts', 'auth0_new_user'):
+            request.session.pop(key, None)
+
+        _ensure_wallet(user)
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
+        auth_login(request, user)
+
+        return redirect('dashboard')
+
+
+class Auth0ResendOtpView(View):
+    """Resend OTP for Auth0 login flow."""
+
+    def get(self, request):
+        return self._resend(request)
+
+    def post(self, request):
+        return self._resend(request)
+
+    def _resend(self, request):
+        email = request.session.get('auth0_login_email')
+        user_id = request.session.get('auth0_login_user_id')
+        if not email or not user_id:
+            return redirect('login')
+        code = _create_otp_for_email(email)
+        request.session['auth0_otp_attempts'] = 0
+        send_otp_email(email, code)
+        return redirect('auth0_verify_otp')
+
+
+class Auth0LinkAccountView(View):
+    """Authorization page — shown when an Auth0 email matches an existing account."""
+
+    def get(self, request):
+        auth0_data = request.session.get('auth0_link_data')
+        user_id = request.session.get('auth0_link_user_id')
+        if not auth0_data or not user_id:
+            return redirect('login')
+
+        try:
+            existing_user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return redirect('login')
+
+        return render(request, 'core/google_link_account.html', {
+            'auth0_name': auth0_data.get('name', ''),
+            'auth0_email': auth0_data.get('email', ''),
+            'auth0_picture': auth0_data.get('picture', ''),
+            'user_email': existing_user.email,
+        })
+
+
+def auth0_link_confirm(request):
+    """POST: user enters password to confirm linking Auth0 to existing account."""
+    if request.method != 'POST':
+        return redirect('auth0_link_account')
+
+    auth0_data = request.session.get('auth0_link_data')
+    user_id = request.session.get('auth0_link_user_id')
+    if not auth0_data or not user_id:
+        return redirect('login')
+
+    try:
+        existing_user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return redirect('login')
+
+    password = request.POST.get('password', '')
+    if not password:
+        return render(request, 'core/google_link_account.html', {
+            'auth0_name': auth0_data.get('name', ''),
+            'auth0_email': auth0_data.get('email', ''),
+            'auth0_picture': auth0_data.get('picture', ''),
+            'user_email': existing_user.email,
+            'error': 'Please enter your password to confirm.',
+        })
+
+    if not existing_user.check_password(password):
+        return render(request, 'core/google_link_account.html', {
+            'auth0_name': auth0_data.get('name', ''),
+            'auth0_email': auth0_data.get('email', ''),
+            'auth0_picture': auth0_data.get('picture', ''),
+            'user_email': existing_user.email,
+            'error': 'Incorrect password. Please try again.',
+        })
+
+    # Password verified — create SocialAccount link
+    SocialAccount.objects.get_or_create(
+        provider='auth0',
+        provider_uid=auth0_data['sub'],
+        defaults={
+            'user': existing_user,
+            'email': auth0_data['email'],
+            'display_name': auth0_data.get('name', ''),
+            'avatar_url': auth0_data.get('picture', ''),
+        },
+    )
+
+    # Clean up session data
+    for key in ('auth0_link_data', 'auth0_link_user_id'):
+        request.session.pop(key, None)
+
+    # Now send OTP for security (this is a crypto site!)
+    request.session['auth0_login_user_id'] = existing_user.pk
+    request.session['auth0_login_email'] = existing_user.email
+    code = _create_otp_for_email(existing_user.email)
+    send_otp_email(existing_user.email, code)
+    return redirect('auth0_verify_otp')
+
+
+def auth0_link_cancel(request):
+    """Cancel Auth0 account linking and return to login."""
+    for key in ('auth0_link_data', 'auth0_link_user_id'):
+        request.session.pop(key, None)
+    return redirect('login')
+
+
 # region binance proxy
 import json as _jsonlib
 import urllib.parse as _urlparse
 import urllib.request as _urlrequest
 
 _BINANCE_BASE = "https://api.binance.com"
+_BINANCE_FAPI_BASE = "https://fapi.binance.com"
 _COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 
 
@@ -748,6 +1042,71 @@ def binance_klines(request):
     except ValueError:
         return HttpResponseBadRequest(_jsonlib.dumps({"error": "limit_invalid"}), content_type="application/json")
     return _proxy_binance("/api/v3/klines", {"symbol": symbol, "interval": interval, "limit": limit_val})
+
+
+def binance_agg_trades(request):
+    symbol = (request.GET.get("symbol") or "").upper().strip()
+    if not symbol:
+        return HttpResponseBadRequest(_jsonlib.dumps({"error": "symbol_required"}), content_type="application/json")
+    limit = request.GET.get("limit") or "20"
+    try:
+        limit_val = max(1, min(100, int(limit)))
+    except ValueError:
+        return HttpResponseBadRequest(_jsonlib.dumps({"error": "limit_invalid"}), content_type="application/json")
+    return _proxy_binance("/api/v3/aggTrades", {"symbol": symbol, "limit": limit_val})
+
+
+def binance_premium_index(request):
+    symbol = (request.GET.get("symbol") or "").upper().strip()
+    if not symbol:
+        return HttpResponseBadRequest(_jsonlib.dumps({"error": "symbol_required"}), content_type="application/json")
+    try:
+        query = _urlparse.urlencode({"symbol": symbol})
+        url = f"{_BINANCE_FAPI_BASE}/fapi/v1/premiumIndex?{query}"
+        headers = {"Accept": "application/json", "User-Agent": "NexusCrypto/1.0"}
+        req = _urlrequest.Request(url, headers=headers)
+        with _urlrequest.urlopen(req, timeout=10) as resp:
+            data = resp.read()
+            content_type = resp.headers.get("Content-Type", "application/json")
+            return HttpResponse(data, content_type=content_type)
+    except Exception:
+        return JsonResponse({"error": "binance_fapi_unavailable"}, status=502)
+
+def kyc_submit(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+    
+    doc_type = request.POST.get("document_type")
+    doc_image = request.FILES.get("document_image")
+
+    if not doc_type or not doc_image:
+        return JsonResponse({"error": "missing_data", "message": "Document type and image are required."}, status=400)
+
+    # Make sure user doesn't already have approved KYC
+    kyc, created = KYC.objects.get_or_create(user=request.user)
+    if kyc.status == "approved":
+        return JsonResponse({"error": "already_approved", "message": "Your KYC is already approved."}, status=400)
+
+    kyc.document_type = doc_type
+    kyc.document_image = doc_image
+    kyc.status = "pending"
+    kyc.save()
+
+    return JsonResponse({"status": "ok", "message": "KYC submitted successfully and is pending review."})
+
+
+def kyc_status(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+    
+    try:
+        kyc = KYC.objects.get(user=request.user)
+        return JsonResponse({"status": "ok", "kyc_status": kyc.status})
+    except KYC.DoesNotExist:
+        return JsonResponse({"status": "ok", "kyc_status": "unverified"})
+
 
 # CoinGecko proxy endpoints
 def coingecko_markets(request):
@@ -1088,7 +1447,7 @@ def withdrawal(request):
             wallet.total_withdrawals += amount
             wallet.save(update_fields=["balance", "total_withdrawals"])
 
-            tx = _record_wallet_transaction(
+            tx = WalletTransaction.objects.create(
                 wallet=wallet,
                 user=request.user,
                 tx_type='withdrawal',
@@ -1096,22 +1455,26 @@ def withdrawal(request):
                 amount=amount,
                 fee=WITHDRAWAL_FEE,
                 method='wallet',
-                details=f"Withdrawal sent to {destination_wallet_address}",
+                status='pending',
+                details=f"Withdrawal to {destination_wallet_address} (pending review)",
             )
+            # Create ledger entry for the pending withdrawal
+            _record_ledger_pair(wallet=wallet, tx=tx, tx_type='withdrawal', asset='USDT', amount=amount)
 
-            # Charge the withdrawal fee separately
+            # Charge the withdrawal fee immediately
             _charge_fee(
                 wallet=wallet,
                 user=request.user,
                 fee_amount=WITHDRAWAL_FEE,
                 fee_type='withdrawal_fee',
-                details=f"Withdrawal fee for TX {tx.reference if tx else 'N/A'}",
+                details=f"Withdrawal fee for TX {tx.reference}",
             )
 
         return JsonResponse(
             {
                 "status": "ok",
-                "message": "Withdrawal completed successfully.",
+                "message": "Withdrawal submitted for review. It will be processed shortly.",
+                "withdrawal_status": "pending",
                 "wallet": WalletSerializer(wallet=wallet, user=request.user).data,
                 "transaction": WalletTransactionSerializer(tx).data,
                 "history_rows": _wallet_transaction_to_history_row(tx),

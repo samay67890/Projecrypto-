@@ -1,6 +1,6 @@
 (function () {
     const containerId = "marginChart";
-    const BINANCE_API_BASE = "https://api.binance.com/api/v3";
+    const BINANCE_API_BASE = "/api/binance";
     const candles = [];
     const maxCandles = 200;
     let chart;
@@ -286,7 +286,7 @@
     async function loadTicker(symbol) {
         if (!symbol) return;
         try {
-            const data = await fetchJson(`${BINANCE_API_BASE}/ticker/24hr?symbol=${symbol}USDT`);
+            const data = await fetchJson(`${BINANCE_API_BASE}/ticker-24hr/?symbol=${symbol}USDT`);
             const price = Number(data.lastPrice);
             if (Number.isFinite(price)) {
                 const elLivePrice = document.getElementById("marginLivePrice");
@@ -310,7 +310,7 @@
     async function loadOrderBook(symbol) {
         if (!symbol) return;
         try {
-            const data = await fetchJson(`${BINANCE_API_BASE}/depth?symbol=${symbol}USDT&limit=15`);
+            const data = await fetchJson(`${BINANCE_API_BASE}/depth/?symbol=${symbol}USDT&limit=15`);
             renderOrderRows(document.getElementById("marginOrderAsks"), data.asks || [], "ask");
             renderOrderRows(document.getElementById("marginOrderBids"), data.bids || [], "bid");
         } catch (error) {
@@ -397,7 +397,7 @@
     async function fetchHistoricalCandles(symbol, interval, attempt = 0) {
         if (!symbol) return false;
         try {
-            const response = await fetch(`${BINANCE_API_BASE}/klines?symbol=${symbol}USDT&interval=${interval}&limit=${maxCandles}`);
+            const response = await fetch(`${BINANCE_API_BASE}/klines/?symbol=${symbol}USDT&interval=${interval}&limit=${maxCandles}`);
             if (!response.ok) throw new Error("kline fetch failed");
             const data = await response.json();
             if (!Array.isArray(data) || !data.length) throw new Error("no kline data");

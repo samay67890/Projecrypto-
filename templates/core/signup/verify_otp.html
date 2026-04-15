@@ -28,7 +28,7 @@
         <h2>Authentication</h2>
         <p>Please enter the 6-digit verification code sent to <span class="email-highlight">{{ email }}</span></p>
 
-        <form action="{% url 'signup_verify_otp' %}" method="post" id="verify-otp-form">
+        <form action="{% if google_otp %}{% url 'google_verify_otp' %}{% else %}{% url 'signup_verify_otp' %}{% endif %}" method="post" id="verify-otp-form">
             {% csrf_token %}
             <input type="hidden" name="otp" id="otp-value" value="">
 
@@ -55,7 +55,7 @@
         </form>
 
         <div class="resend-text">
-            Didn't receive the code? <a href="{% url 'signup_resend_otp' %}" class="resend-link" id="resend-btn">Resend Code</a>
+            Didn't receive the code? <a href="{% if google_otp %}{% url 'google_resend_otp' %}{% else %}{% url 'signup_resend_otp' %}{% endif %}" class="resend-link" id="resend-btn">Resend Code</a>
         </div>
     </div>
 

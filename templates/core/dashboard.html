@@ -132,52 +132,131 @@
                 </section>
 
                 <section class="dashboard-view" id="view-fiat">
-                    <div class="fiat-spot-view">
-                        <div class="fiat-balance-card">
-                            <div class="glow-orb"></div>
-                            <span>Fiat and Spot Balance</span>
-                            <h1>$<span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> <small>~ <span data-balance-btc>{{ initial_btc|floatformat:6 }}</span> <span id="fiatCoinSymbol">BTC</span></small></h1>
-                            <div class="fiat-actions">
-                                <button class="gradient-btn deposit-btn" type="button" data-deposit-url="{% url 'deposit_methods' %}">Deposit</button>
-                                <button class="outline-btn">Withdraw</button>
+                    <div class="fiat-spot-view fiat-pro-view">
+                        <section class="fiat-hero-card">
+                            <div class="fiat-hero-aura"></div>
+                            <div class="fiat-hero-main">
+                                <div class="fiat-kicker">Fiat & Spot Portfolio</div>
+                                <h1 id="fiatPortfolioValue">$0.00</h1>
+                                <p class="fiat-hero-sub">
+                                    <span id="fiatSelectedQty">{{ initial_btc|floatformat:6 }}</span>
+                                    <span id="fiatCoinSymbol">BTC</span>
+                                    <span class="fiat-dot">&middot;</span>
+                                    <span id="fiatSelectedValue">$0.00</span>
+                                </p>
                             </div>
-                        </div>
+                            <div class="fiat-actions">
+                                <button class="gradient-btn deposit-btn" type="button" data-deposit-url="{% url 'deposit_methods' %}">
+                                    <i class="fas fa-arrow-down"></i> Deposit
+                                </button>
+                                <button class="outline-btn withdraw-btn" type="button" id="openFiatWithdraw">
+                                    <i class="fas fa-arrow-up"></i> Withdraw
+                                </button>
+                            </div>
+                        </section>
 
-                        <div class="asset-table-wrap">
-                            <table>
+                        <section class="fiat-kpi-strip">
+                            <article class="fiat-kpi-card">
+                                <span>24h Wallet Delta</span>
+                                <strong id="fiatKpi24hValue">$0.00</strong>
+                                <small id="fiatKpi24hPct">0.00%</small>
+                            </article>
+                            <article class="fiat-kpi-card">
+                                <span>Largest Holding</span>
+                                <strong id="fiatKpiTopAsset">USDT</strong>
+                                <small id="fiatKpiTopShare">0.00% allocation</small>
+                            </article>
+                            <article class="fiat-kpi-card">
+                                <span>Concentration Risk</span>
+                                <strong id="fiatKpiConcentration">Low</strong>
+                                <small id="fiatKpiConcentrationHint">Portfolio is diversified.</small>
+                            </article>
+                            <article class="fiat-kpi-card">
+                                <span>Liquidity Signal</span>
+                                <strong id="fiatKpiLiquidity">Balanced</strong>
+                                <small id="fiatKpiLiquidityDetail">Spread --</small>
+                            </article>
+                        </section>
+
+                        <section class="fiat-analytics-grid">
+                            <article class="fiat-analytics-card">
+                                <div class="fiat-card-head">
+                                    <h3>Allocation</h3>
+                                    <span id="fiatAllocationCount">0 assets</span>
+                                </div>
+                                <div class="fiat-allocation-wrap">
+                                    <div class="fiat-allocation-donut" id="fiatAllocationDonut" role="img" aria-label="Portfolio allocation donut">
+                                        <div class="fiat-donut-center">
+                                            <strong id="fiatDonutTotal">$0.00</strong>
+                                            <span>Total</span>
+                                        </div>
+                                    </div>
+                                    <div class="fiat-allocation-legend" id="fiatAllocationLegend"></div>
+                                </div>
+                            </article>
+
+                            <article class="fiat-analytics-card">
+                                <div class="fiat-card-head">
+                                    <h3>24h Performance</h3>
+                                    <span id="fiatPerfRange">Selected asset</span>
+                                </div>
+                                <canvas id="fiatPerformanceChart" height="160"></canvas>
+                                <div class="fiat-chart-foot">
+                                    <span>Trend (15m)</span>
+                                    <strong id="fiatPerfChange">--</strong>
+                                </div>
+                            </article>
+
+                            <article class="fiat-analytics-card">
+                                <div class="fiat-card-head">
+                                    <h3>Risk Meter</h3>
+                                    <span id="fiatRiskTier">Low</span>
+                                </div>
+                                <div class="fiat-risk-score" id="fiatRiskScore">Score 0 / 100</div>
+                                <div class="fiat-risk-track">
+                                    <div class="fiat-risk-fill" id="fiatRiskFill"></div>
+                                </div>
+                                <div class="fiat-risk-breakdown">
+                                    <div><span>Volatility</span><strong id="fiatRiskVolatility">0.00%</strong></div>
+                                    <div><span>Spread</span><strong id="fiatRiskSpread">--</strong></div>
+                                    <div><span>Concentration</span><strong id="fiatRiskConcentration">0.00%</strong></div>
+                                </div>
+                            </article>
+
+                            <article class="fiat-analytics-card fiat-insight-card">
+                                <div class="fiat-card-head">
+                                    <h3>Actionable Insight</h3>
+                                    <span>Smart Assist</span>
+                                </div>
+                                <h4 id="fiatInsightTitle">Portfolio warming up</h4>
+                                <p id="fiatInsightBody">We will show live optimization guidance as market and allocation data streams in.</p>
+                                <button type="button" class="outline-btn fiat-action-btn" id="fiatInsightAction" data-target-view="trade">Open Trade Terminal</button>
+                            </article>
+                        </section>
+
+                        <section class="asset-table-wrap fiat-asset-table-wrap">
+                            <div class="fiat-table-head">
+                                <h3>Asset Balances</h3>
+                                <span id="fiatTableSummary">Live valuation</span>
+                            </div>
+                            <table class="fiat-asset-table">
                                 <thead>
                                     <tr>
                                         <th>Asset</th>
-                                        <th>Total Balance</th>
-                                        <th>Available</th>
-                                        <th>In Order</th>
+                                        <th class="right">Quantity</th>
+                                        <th class="right">Price</th>
+                                        <th class="right">Value</th>
+                                        <th class="right">Allocation</th>
                                         <th class="right">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="fiatAssetTableBody">
                                     <tr>
-                                        <td class="asset-cell">
-                                            <div class="asset-icon usdt"><i class="fas fa-dollar-sign"></i></div>
-                                            <b>USDT <span>Tether</span></b>
-                                        </td>
-                                        <td><span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> USDT</td>
-                                        <td><span data-balance-usdt>{{ initial_usdt|floatformat:2 }}</span> USDT</td>
-                                        <td>0.00</td>
-                                        <td class="right action-link" data-view="margin">Trade</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="asset-cell">
-                                            <div class="asset-icon btc"><i class="fab fa-bitcoin"></i></div>
-                                            <b><span id="assetCoinSymbol">BTC</span> <span id="assetCoinName">Bitcoin</span></b>
-                                        </td>
-                                        <td><span data-balance-btc>0.000000</span> <span id="assetCoinSymbol2">BTC</span></td>
-                                        <td><span data-balance-btc>0.000000</span> <span id="assetCoinSymbol3">BTC</span></td>
-                                        <td>0.00</td>
-                                        <td class="right action-link deposit-link" data-deposit-url="{% url 'deposit_methods' %}" role="button" tabindex="0">Deposit</td>
+                                        <td colspan="6" class="history-muted">Loading wallet assets...</td>
                                     </tr>
                                 </tbody>
                             </table>
-                        </div>
+                        </section>
                     </div>
                 </section>
 
@@ -869,25 +948,59 @@
                             <p>Manage your submitted documents and track your verification progress.</p>
                         </div>
 
-                        <div class="ident-status-grid">
-                            <div class="ident-card">
-                                <span class="ident-badge pending"><i class="fas fa-clock"></i> Verification Pending</span>
-                                <h2>Level 1: Personal Verification</h2>
-                                <p>
-                                    Your documents are currently being reviewed by our compliance team. This usually takes 24-48 hours.
-                                    Once approved, your daily withdrawal limit will increase to 100 BTC.
-                                </p>
-                            </div>
-
-                            <div class="ident-card ident-card-side">
-                                <span class="ident-kicker">Next Milestone</span>
-                                <h3>Level 2: Plus</h3>
-                                <p>Requires Proof of Address</p>
-                                <button class="outline-btn ident-lock-btn" type="button" disabled>Locked</button>
+                        <!-- Dynamic State Wrappers -->
+                        <div id="kycStateUnverified" style="display: none;">
+                            <div class="ident-status-grid">
+                                <div class="ident-card">
+                                    <span class="ident-badge default"><i class="fas fa-exclamation-circle"></i> Action Required</span>
+                                    <h2>Level 1: Personal Verification</h2>
+                                    <p>Please submit your identification document to unlock higher withdrawal limits and features.</p>
+                                    <div style="margin-top: 15px;">
+                                        <button class="gradient-btn ident-upload-btn" type="button" onclick="document.getElementById('identificationUploadModal').setAttribute('aria-hidden', 'false')">
+                                            <i class="fas fa-plus"></i> Upload Document
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="ident-card ident-card-side">
+                                    <span class="ident-kicker">Next Milestone</span>
+                                    <h3>Level 2: Plus</h3>
+                                    <p>Requires Proof of Address</p>
+                                    <button class="outline-btn ident-lock-btn" type="button" disabled>Locked</button>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="ident-card">
+                        <div id="kycStatePending" style="display: none;">
+                            <div class="ident-status-grid">
+                                <div class="ident-card">
+                                    <span class="ident-badge pending"><i class="fas fa-clock"></i> Verification Pending</span>
+                                    <h2>Level 1: Personal Verification</h2>
+                                    <p>Your document is currently being reviewed by our compliance team. This usually takes 24-48 hours.</p>
+                                </div>
+                                <div class="ident-card ident-card-side">
+                                    <span class="ident-kicker">Status</span>
+                                    <h3>Under Review</h3>
+                                    <p>We will notify you via email once completed.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="kycStateApproved" style="display: none;">
+                            <div class="ident-status-grid">
+                                <div class="ident-card" style="border-top-color: #0ecb81;">
+                                    <span class="ident-badge approved" style="color: #0ecb81; background: rgba(14,203,129,0.1);"><i class="fas fa-check-circle"></i> Verified</span>
+                                    <h2>Level 1: Personal Verification</h2>
+                                    <p>Your identity has been fully verified. You now have unrestricted access to all trading features and maximum withdrawal limits.</p>
+                                </div>
+                                <div class="ident-card ident-card-side">
+                                    <span class="ident-kicker">Next Milestone</span>
+                                    <h3>Level 2: Plus</h3>
+                                    <p>Requires Proof of Address</p>
+                                    <button class="outline-btn ident-lock-btn" type="button" disabled>Locked</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ident-card" id="kycSubmittedDocs" style="display: none;">
                             <div class="ident-doc-head">
                                 <h3>Submitted Documents</h3>
                                 <button class="gradient-btn ident-upload-btn" type="button" id="openIdentificationUpload">
@@ -946,10 +1059,9 @@
                             <p class="ident-modal-subtitle">Select the type of document you are uploading.</p>
                             <div class="field">
                                 <select id="identificationDocType">
-                                    <option>Government Issued ID</option>
-                                    <option>Driver's License</option>
-                                    <option>Bank Statement (Residence)</option>
-                                    <option>Utility Bill</option>
+                                    <option value="id_card">ID Card</option>
+                                    <option value="passport">Passport</option>
+                                    <option value="drivers_license">Driver's License</option>
                                 </select>
                             </div>
 
@@ -994,6 +1106,32 @@
                     <button type="button" class="outline-btn" id="cancelEarnModal">Cancel</button>
                     <button type="button" class="gradient-btn" id="confirmEarnModal">Confirm Subscribe</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="fiat-withdraw-modal" id="fiatWithdrawModal" aria-hidden="true">
+        <div class="fiat-withdraw-card">
+            <div class="fiat-withdraw-head">
+                <h2>Withdraw USDT</h2>
+                <button type="button" class="fiat-withdraw-close" id="closeFiatWithdraw" aria-label="Close withdrawal modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="fiat-withdraw-sub">Send funds from your spot wallet to an external wallet address.</p>
+            <div class="field">
+                <label for="fiatWithdrawAmount">Amount (USDT)</label>
+                <input id="fiatWithdrawAmount" type="number" min="0" step="0.01" placeholder="0.00">
+                <small class="fiat-input-note">Minimum withdrawal: 10 USDT. Fee: 1 USDT.</small>
+            </div>
+            <div class="field">
+                <label for="fiatWithdrawAddress">Destination Wallet Address</label>
+                <input id="fiatWithdrawAddress" type="text" placeholder="Enter destination wallet address">
+            </div>
+            <div class="fiat-withdraw-status" id="fiatWithdrawStatus"></div>
+            <div class="fiat-withdraw-actions">
+                <button type="button" class="outline-btn" id="fiatWithdrawCancel">Cancel</button>
+                <button type="button" class="gradient-btn" id="fiatWithdrawSubmit">Confirm Withdrawal</button>
             </div>
         </div>
     </div>

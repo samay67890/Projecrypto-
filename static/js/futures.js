@@ -182,7 +182,7 @@
         try {
             const interval = currentInterval;
             const limit = ["1d", "1w"].includes(interval) ? 1000 : 500;
-            const rows = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
+            const rows = await fetchJson(`${BINANCE_API_BASE}/klines/?symbol=${SYMBOL}&interval=${interval}&limit=${limit}`);
             const candles = Array.isArray(rows)
                 ? rows.map((r) => ({
                     time: timeToLocal(Number(r[0])),
@@ -256,7 +256,7 @@
      */
     async function loadFundingInfo() {
         try {
-            const data = await fetchJson(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${SYMBOL}`);
+            const data = await fetchJson(`${BINANCE_API_BASE}/premium-index/?symbol=${SYMBOL}`);
 
             // Mark price
             const markEl = statMark();
@@ -436,7 +436,7 @@
 
     async function loadRecentTrades() {
         try {
-            const data = await fetchJson(`https://api.binance.com/api/v3/aggTrades?symbol=${SYMBOL}&limit=20`);
+            const data = await fetchJson(`${BINANCE_API_BASE}/agg-trades/?symbol=${SYMBOL}&limit=20`);
             if (!Array.isArray(data)) return;
             const container = document.getElementById("futuresTrades");
             if (!container) return;

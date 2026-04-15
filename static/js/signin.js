@@ -1,30 +1,34 @@
+// NexusCrypto signin (login) - client-side validation + Google Sign-In
 document.addEventListener("DOMContentLoaded", function () {
+  // ─── Email/Password form validation ───
   const form = document.getElementById("signin-form");
-  if (!form) return;
+  if (form) {
+    form.addEventListener("submit", function (event) {
+      const emailInput = form.querySelector('input[name="email"]');
+      const passwordInput = form.querySelector('input[name="password"]');
 
-  form.addEventListener("submit", function (event) {
-    const emailInput = form.querySelector('input[name="email"]');
-    const passwordInput = form.querySelector('input[name="password"]');
+      const email = emailInput ? emailInput.value.trim() : "";
+      const password = passwordInput ? passwordInput.value : "";
 
-    const email = emailInput ? emailInput.value.trim() : "";
-    const password = passwordInput ? passwordInput.value : "";
-
-    if (!email || !password) {
-      event.preventDefault();
-      alert("Please enter both email and password.");
-      if (!email && emailInput) {
-        emailInput.focus();
-      } else if (passwordInput) {
-        passwordInput.focus();
+      if (!email || !password) {
+        event.preventDefault();
+        alert("Please enter both email and password.");
+        if (!email && emailInput) {
+          emailInput.focus();
+        } else if (passwordInput) {
+          passwordInput.focus();
+        }
+        return;
       }
-      return;
-    }
 
-    const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!isEmailValid) {
-      event.preventDefault();
-      alert("Please enter a valid email address.");
-      if (emailInput) emailInput.focus();
-    }
-  });
+      const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!isEmailValid) {
+        event.preventDefault();
+        alert("Please enter a valid email address.");
+        if (emailInput) emailInput.focus();
+      }
+    });
+  }
+
+
 });

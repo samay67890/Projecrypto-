@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.apps import apps
 from django.contrib import admin, messages
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from django.contrib.admin.sites import AlreadyRegistered
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -198,7 +199,7 @@ class AccountStatusFilter(admin.SimpleListFilter):
         return queryset
 
 
-class UserControlAdmin(admin.ModelAdmin):
+class UserControlAdmin(UnfoldModelAdmin):
     list_display = (
         "username_col",
         "email_col",
@@ -302,7 +303,7 @@ class UserControlAdmin(admin.ModelAdmin):
         self.message_user(request, f"{updated} user(s) removed from staff.", level=messages.WARNING)
 
 
-class OTPAdmin(admin.ModelAdmin):
+class OTPAdmin(UnfoldModelAdmin):
     list_display = ("email_col", "user_col", "is_used_col", "created_at_col", "expires_at_col")
     ordering = ("-created_at",)
     actions = ("mark_selected_as_used", "delete_expired_otps")
@@ -351,7 +352,7 @@ class OTPAdmin(admin.ModelAdmin):
         self.message_user(request, f"{deleted_count} expired OTP(s) deleted.", level=messages.SUCCESS)
 
 
-class KYCAdmin(admin.ModelAdmin):
+class KYCAdmin(UnfoldModelAdmin):
     list_display = (
         "user_col",
         "document_col",
@@ -424,7 +425,7 @@ class KYCAdmin(admin.ModelAdmin):
         )
 
 
-class WalletAdmin(admin.ModelAdmin):
+class WalletAdmin(UnfoldModelAdmin):
     list_display = (
         "user_col",
         "wallet_address_col",
@@ -463,7 +464,7 @@ class WalletAdmin(admin.ModelAdmin):
         return tuple(fields)
 
 
-class TransactionAdmin(admin.ModelAdmin):
+class TransactionAdmin(UnfoldModelAdmin):
     list_display = (
         "transaction_id_col",
         "user_col",
@@ -520,7 +521,7 @@ class TransactionAdmin(admin.ModelAdmin):
         return tuple(fields)
 
 
-class TradeAdmin(admin.ModelAdmin):
+class TradeAdmin(UnfoldModelAdmin):
     list_display = (
         "trade_id_col",
         "user_col",
@@ -595,7 +596,7 @@ class TradeAdmin(admin.ModelAdmin):
         return tuple(filters)
 
 
-class WalletAssetAdmin(admin.ModelAdmin):
+class WalletAssetAdmin(UnfoldModelAdmin):
     list_display = ("wallet_col", "symbol_col", "balance_col", "updated_at_col")
     ordering = ("symbol",)
 
@@ -616,7 +617,7 @@ class WalletAssetAdmin(admin.ModelAdmin):
         return safe_value(obj, "updated_at")
 
 
-class PositionAdmin(admin.ModelAdmin):
+class PositionAdmin(UnfoldModelAdmin):
     list_display = ("position_id_col", "user_col", "symbol_col", "market_type_col", "side_col", "status_col", "opened_at_col")
     ordering = ("-id",)
 
@@ -649,7 +650,7 @@ class PositionAdmin(admin.ModelAdmin):
         return safe_value(obj, "opened_at")
 
 
-class CryptoCoinAdmin(admin.ModelAdmin):
+class CryptoCoinAdmin(UnfoldModelAdmin):
     list_display = ("coin_name_col", "symbol_col", "price_col", "trading_status_col", "risk_level_col")
     ordering = ("symbol",)
     actions = ("enable_trading", "disable_trading", "update_price")
@@ -737,7 +738,7 @@ class CryptoCoinAdmin(admin.ModelAdmin):
         self.message_user(request, f"Updated price for {updated} coin(s).", level=messages.SUCCESS)
 
 
-class SecurityLogAdmin(admin.ModelAdmin):
+class SecurityLogAdmin(UnfoldModelAdmin):
     list_display = ("user_col", "event_type_col", "ip_address_col", "timestamp_col")
     ordering = ("-id",)
 
@@ -770,7 +771,7 @@ class SecurityLogAdmin(admin.ModelAdmin):
         return False
 
 
-class PlatformSettingsAdmin(admin.ModelAdmin):
+class PlatformSettingsAdmin(UnfoldModelAdmin):
     list_display = (
         "minimum_deposit_col",
         "maximum_trade_amount_col",
@@ -800,7 +801,7 @@ def get_ledger_entry_model():
     return get_model_by_name("LedgerEntry")
 
 
-class LedgerEntryAdmin(admin.ModelAdmin):
+class LedgerEntryAdmin(UnfoldModelAdmin):
     list_display = ("entry_type_col", "wallet_col", "asset_col", "amount_col", "balance_after_col", "reference_col", "created_at_col")
     ordering = ("-id",)
     list_filter = ("entry_type", "asset", "created_at")
@@ -841,7 +842,7 @@ class LedgerEntryAdmin(admin.ModelAdmin):
         return False
 
 
-class WalletTransactionFullAdmin(admin.ModelAdmin):
+class WalletTransactionFullAdmin(UnfoldModelAdmin):
     list_display = ("reference_col", "user_col", "tx_type_col", "asset_col", "amount_col", "fee_col", "status_col", "created_at_col")
     ordering = ("-id",)
     list_filter = ("tx_type", "status", "asset", "created_at")
@@ -878,6 +879,36 @@ class WalletTransactionFullAdmin(admin.ModelAdmin):
     @admin.display(description="Created At", ordering="created_at")
     def created_at_col(self, obj):
         return obj.created_at
+
+    actions = ["approve_withdrawals", "reject_withdrawals"]
+
+    @admin.action(description="✅ Approve selected pending withdrawals")
+    def approve_withdrawals(self, request, queryset):
+        pending = queryset.filter(tx_type='withdrawal', status='pending')
+        count = 0
+        for tx in pending:
+            tx.status = 'completed'
+            tx.details = tx.details.replace('(pending review)', '(approved)')
+            tx.save(update_fields=['status', 'details'])
+            count += 1
+        self.message_user(request, f"{count} withdrawal(s) approved.")
+
+    @admin.action(description="❌ Reject selected pending withdrawals (refund balance)")
+    def reject_withdrawals(self, request, queryset):
+        from django.db import transaction as db_transaction
+        pending = queryset.filter(tx_type='withdrawal', status='pending')
+        count = 0
+        for tx in pending:
+            with db_transaction.atomic():
+                wallet = tx.wallet.__class__.objects.select_for_update().get(pk=tx.wallet_id)
+                wallet.balance += tx.amount
+                wallet.total_withdrawals -= tx.amount
+                wallet.save(update_fields=['balance', 'total_withdrawals'])
+                tx.status = 'failed'
+                tx.details = tx.details.replace('(pending review)', '(rejected — refunded)')
+                tx.save(update_fields=['status', 'details'])
+                count += 1
+        self.message_user(request, f"{count} withdrawal(s) rejected and refunded.")
 
 
 User = get_user_model()

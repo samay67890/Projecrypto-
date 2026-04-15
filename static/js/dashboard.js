@@ -11,6 +11,19 @@
     const STARTING_USDT = Number.isFinite(Number(bootstrap.initialUSDT)) ? Number(bootstrap.initialUSDT) : 0;
     const BINANCE_API_BASE = "/api/binance";
     const COINGECKO_API_BASE = "/api/coingecko";
+    const FIAT_WITHDRAW_MIN = 10;
+    const FIAT_WITHDRAW_FEE = 1;
+    const FIAT_PERFORMANCE_POINTS = 96;
+    const FIAT_ADDRESS_PATTERN = /^[A-Za-z0-9][A-Za-z0-9\-_]{5,254}$/;
+    const FIAT_ALLOC_COLORS = [
+        "#00E5FF",
+        "#7F56D9",
+        "#0ECB81",
+        "#F0B90B",
+        "#45A3FF",
+        "#FF6B6B",
+        "#9AA4B2",
+    ];
     const state = loadState();
     const USE_SIM_MARKET = false;
     let dataProvider = "binance";
@@ -39,6 +52,24 @@
         lastAt: 0,
         live: false,
     };
+    const fiatState = {
+        performanceSeries: [],
+        performanceSymbol: "",
+        performanceFetchedAt: 0,
+        performanceFetchInFlight: null,
+        performanceFetchSymbol: "",
+        microstructure: {
+            bestBid: 0,
+            bestAsk: 0,
+            spread: 0,
+            spreadPct: 0,
+            bidVolume: 0,
+            askVolume: 0,
+            imbalance: 0,
+            signal: "Unknown",
+        },
+        withdrawSubmitting: false,
+    };
 
     initDebugGuards();
     runUiSanityChecks();
@@ -55,6 +86,7 @@
     initEarnHub();
     initHistoryView();
     initDepositNavigation();
+    initFiatWorkspace();
     initCharts();
     initDataProvider();
     updateCoinHeader();
@@ -426,6 +458,10 @@
         return Number(value).toFixed(6);
     }
 
+    function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, Number(value)));
+    }
+
     function ensureWallet() {
         if (!state.wallet || typeof state.wallet !== "object") {
             state.wallet = {};
@@ -535,6 +571,10 @@
         }
         if (view === "futures") {
             renderFuturesPositions();
+        }
+        if (view === "fiat") {
+            ensureFiatPerformanceSeries(false).catch(() => {});
+            renderFiatWorkspace(window.nexusPortfolioSnapshot || null);
         }
     }
 
@@ -655,29 +695,655 @@
     }
 
     function initDepositNavigation() {
-        const primaryBtn = document.querySelector(".deposit-btn[data-deposit-url]");
-        const actionLinks = document.querySelectorAll(".deposit-link[data-deposit-url]");
-
         const navigate = (url) => {
             if (!url) return;
             window.location.href = url;
         };
 
-        if (primaryBtn) {
-            primaryBtn.addEventListener("click", () => {
-                navigate(primaryBtn.getAttribute("data-deposit-url"));
+        document.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            const action = target.closest(".deposit-btn[data-deposit-url], .deposit-link[data-deposit-url]");
+            if (!action) return;
+            navigate(action.getAttribute("data-deposit-url"));
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            const action = target.closest(".deposit-link[data-deposit-url]");
+            if (!action) return;
+            event.preventDefault();
+            navigate(action.getAttribute("data-deposit-url"));
+        });
+    }
+
+    function initFiatWorkspace() {
+        const modal = qs("fiatWithdrawModal");
+        const openBtn = qs("openFiatWithdraw");
+        const closeBtn = qs("closeFiatWithdraw");
+        const cancelBtn = qs("fiatWithdrawCancel");
+        const submitBtn = qs("fiatWithdrawSubmit");
+        const amountInput = qs("fiatWithdrawAmount");
+        const addressInput = qs("fiatWithdrawAddress");
+        const statusEl = qs("fiatWithdrawStatus");
+
+        const setWithdrawStatus = (message, tone = "") => {
+            if (!statusEl) return;
+            statusEl.textContent = message || "";
+            statusEl.classList.remove("is-error", "is-success", "is-info");
+            if (tone === "error") statusEl.classList.add("is-error");
+            if (tone === "success") statusEl.classList.add("is-success");
+            if (tone === "info") statusEl.classList.add("is-info");
+        };
+
+        const openModal = () => {
+            if (!modal) return;
+            modal.classList.add("show");
+            modal.setAttribute("aria-hidden", "false");
+            setWithdrawStatus("");
+            if (amountInput) amountInput.focus();
+        };
+
+        const closeModal = () => {
+            if (!modal) return;
+            modal.classList.remove("show");
+            modal.setAttribute("aria-hidden", "true");
+            setWithdrawStatus("");
+        };
+
+        if (openBtn) openBtn.addEventListener("click", openModal);
+        if (closeBtn) closeBtn.addEventListener("click", closeModal);
+        if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+
+        if (modal) {
+            modal.addEventListener("click", (event) => {
+                if (event.target === modal) closeModal();
             });
         }
 
-        actionLinks.forEach((el) => {
-            el.addEventListener("click", () => navigate(el.getAttribute("data-deposit-url")));
-            el.addEventListener("keydown", (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    navigate(el.getAttribute("data-deposit-url"));
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && modal?.classList.contains("show")) {
+                closeModal();
+            }
+        });
+
+        if (submitBtn) {
+            submitBtn.addEventListener("click", async () => {
+                if (fiatState.withdrawSubmitting) return;
+
+                const amount = Number(amountInput?.value || 0);
+                const walletAddress = String(addressInput?.value || "").trim();
+                const available = getWalletBalance("USDT");
+                const totalDebit = amount + FIAT_WITHDRAW_FEE;
+
+                if (!Number.isFinite(amount) || amount <= 0) {
+                    setWithdrawStatus("Enter a valid withdrawal amount.", "error");
+                    return;
+                }
+                if (amount < FIAT_WITHDRAW_MIN) {
+                    setWithdrawStatus(`Minimum withdrawal is ${FIAT_WITHDRAW_MIN} USDT.`, "error");
+                    return;
+                }
+                if (!FIAT_ADDRESS_PATTERN.test(walletAddress)) {
+                    setWithdrawStatus("Enter a valid destination wallet address.", "error");
+                    return;
+                }
+                if (totalDebit > available) {
+                    setWithdrawStatus(`Insufficient USDT. Need ${fmtMoney(totalDebit)} including fee.`, "error");
+                    return;
+                }
+
+                fiatState.withdrawSubmitting = true;
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Submitting...";
+                setWithdrawStatus("Submitting withdrawal request...", "info");
+
+                try {
+                    const response = await fetch("/withdraw/", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": getCookie("csrftoken"),
+                        },
+                        body: JSON.stringify({
+                            amount: Number(amount.toFixed(2)),
+                            wallet_address: walletAddress,
+                        }),
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        setWithdrawStatus(payload?.message || payload?.error || "Unable to process withdrawal.", "error");
+                        return;
+                    }
+
+                    setWithdrawStatus(payload?.message || "Withdrawal submitted and pending review.", "success");
+                    await Promise.allSettled([
+                        syncBackendWallet(),
+                        syncBackendTransactions(120),
+                        syncBackendPortfolioSummary(),
+                    ]);
+                    updateUi();
+                    if (amountInput) amountInput.value = "";
+                    if (addressInput) addressInput.value = "";
+                } catch (error) {
+                    setWithdrawStatus("Network error while submitting withdrawal.", "error");
+                } finally {
+                    fiatState.withdrawSubmitting = false;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Confirm Withdrawal";
                 }
             });
+        }
+
+        document.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            const action = target.closest(".fiat-action-btn[data-target-view]");
+            if (!action) return;
+            const targetView = String(action.getAttribute("data-target-view") || "").trim();
+            if (!targetView) return;
+            if (targetView === "fiat-deposit") {
+                const url = action.getAttribute("data-deposit-url") || getDepositRoute();
+                if (url) window.location.href = url;
+                return;
+            }
+            activateView(targetView);
         });
+
+        document.addEventListener("nexus:portfolio:update", (event) => {
+            renderFiatWorkspace(event.detail || null);
+        });
+
+        if (window.nexusPortfolioSnapshot) {
+            renderFiatWorkspace(window.nexusPortfolioSnapshot);
+        }
+        ensureFiatPerformanceSeries(false).catch(() => {});
+
+        window.addEventListener("resize", () => {
+            if (qs("view-fiat")?.classList.contains("active")) {
+                renderFiatPerformance();
+            }
+        });
+    }
+
+    function getDepositRoute() {
+        const btn = document.querySelector(".deposit-btn[data-deposit-url]");
+        return btn?.getAttribute("data-deposit-url") || "";
+    }
+
+    function renderFiatWorkspace(snapshot) {
+        if (!snapshot || typeof snapshot !== "object") return;
+
+        const rows = buildFiatAssetRows(snapshot);
+        const walletValue = rows.reduce((sum, row) => sum + row.value, 0);
+        const selected = rows.find((row) => row.symbol === selectedCoin.symbol);
+        const selectedQty = selected ? selected.quantity : getWalletBalance(selectedCoin.symbol);
+        const selectedValue = selected ? selected.value : selectedQty * Math.max(getAssetMarkPrice(selectedCoin.symbol), 0);
+        const weightedDelta = rows.reduce((sum, row) => sum + (row.value * (row.change24h / 100)), 0);
+        const deltaPct = walletValue > 0 ? (weightedDelta / walletValue) * 100 : 0;
+
+        const topAsset = rows[0] || null;
+        const topShare = walletValue > 0 && topAsset ? (topAsset.value / walletValue) * 100 : 0;
+        const concentrationTier = topShare >= 65 ? "High" : (topShare >= 40 ? "Medium" : "Low");
+        const concentrationHint = topShare >= 65
+            ? "Large single-asset exposure."
+            : (topShare >= 40 ? "Monitor dominant allocation." : "Portfolio is diversified.");
+
+        const liquidity = fiatState.microstructure;
+
+        setText("fiatPortfolioValue", `$${fmtMoney(walletValue)}`);
+        setText("fiatSelectedQty", fmtAsset(selectedQty));
+        setText("fiatSelectedValue", `$${fmtMoney(selectedValue)}`);
+
+        setText("fiatKpi24hValue", `${weightedDelta >= 0 ? "+" : "-"}$${fmtMoney(Math.abs(weightedDelta))}`);
+        setText("fiatKpi24hPct", `${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(2)}%`);
+        const kpiDelta = qs("fiatKpi24hValue");
+        const kpiPct = qs("fiatKpi24hPct");
+        if (kpiDelta) kpiDelta.style.color = weightedDelta >= 0 ? "var(--green)" : "var(--red)";
+        if (kpiPct) kpiPct.style.color = weightedDelta >= 0 ? "var(--green)" : "var(--red)";
+
+        setText("fiatKpiTopAsset", topAsset ? `${topAsset.symbol} ${topAsset.name}` : "USDT Tether");
+        setText("fiatKpiTopShare", `${topShare.toFixed(2)}% allocation`);
+        setText("fiatKpiConcentration", concentrationTier);
+        setText("fiatKpiConcentrationHint", concentrationHint);
+        setText("fiatKpiLiquidity", liquidity.signal || "Unknown");
+        setText("fiatKpiLiquidityDetail", Number.isFinite(liquidity.spreadPct) && liquidity.spreadPct > 0 ? `Spread ${liquidity.spreadPct.toFixed(3)}%` : "Spread --");
+
+        setText("fiatTableSummary", `${rows.length} assets tracked - Updated ${new Date(snapshot.updatedAt || Date.now()).toLocaleTimeString()}`);
+        renderFiatAllocation(rows, walletValue);
+        renderFiatPerformance();
+        renderFiatAssetTable(rows);
+        renderFiatRiskAndInsight(rows, walletValue, topShare, deltaPct, concentrationTier);
+    }
+
+    function buildFiatAssetRows(snapshot) {
+        const wallet = snapshot?.wallet && typeof snapshot.wallet === "object" ? snapshot.wallet : {};
+        const rows = [];
+
+        Object.entries(wallet).forEach(([symbolRaw, amountRaw]) => {
+            const symbol = String(symbolRaw || "").toUpperCase().trim();
+            const quantity = Number(amountRaw || 0);
+            if (!symbol || !Number.isFinite(quantity) || quantity <= 0) return;
+
+            const marketMeta = coinUniverse.find((coin) => String(coin?.symbol || "").toUpperCase() === symbol);
+            const name = symbol === "USDT" ? "Tether" : String(marketMeta?.name || symbol);
+            const price = resolveFiatAssetPrice(symbol, snapshot);
+            const value = quantity * Math.max(price, 0);
+            const change24h = symbol === selectedCoin.symbol
+                ? Number(lastChangePct || 0)
+                : Number(marketMeta?.change24h || 0);
+
+            rows.push({
+                symbol,
+                name,
+                quantity,
+                price,
+                value,
+                change24h: Number.isFinite(change24h) ? change24h : 0,
+            });
+        });
+
+        if (!rows.length) {
+            const usdt = getWalletBalance("USDT");
+            rows.push({
+                symbol: "USDT",
+                name: "Tether",
+                quantity: usdt,
+                price: 1,
+                value: usdt,
+                change24h: 0,
+            });
+        }
+
+        rows.sort((a, b) => b.value - a.value);
+        const total = rows.reduce((sum, row) => sum + row.value, 0);
+        rows.forEach((row, index) => {
+            row.allocation = total > 0 ? (row.value / total) * 100 : 0;
+            row.color = FIAT_ALLOC_COLORS[index % FIAT_ALLOC_COLORS.length];
+        });
+        return rows;
+    }
+
+    function resolveFiatAssetPrice(symbol, snapshot) {
+        const key = String(symbol || "").toUpperCase().trim();
+        if (!key) return 0;
+        if (key === "USDT") return 1;
+
+        const marketPrices = snapshot?.marketPrices && typeof snapshot.marketPrices === "object"
+            ? snapshot.marketPrices
+            : {};
+        const fromSnapshot = Number(marketPrices[key] || 0);
+        if (Number.isFinite(fromSnapshot) && fromSnapshot > 0) return fromSnapshot;
+
+        const localMark = Number(getAssetMarkPrice(key) || 0);
+        if (Number.isFinite(localMark) && localMark > 0) return localMark;
+
+        if (key === selectedCoin.symbol) {
+            return Number(snapshot?.spot?.markPrice || lastPrice || 0);
+        }
+        return 0;
+    }
+
+    function renderFiatAssetTable(rows) {
+        const body = qs("fiatAssetTableBody");
+        if (!body) return;
+
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="6" class="history-muted">No assets found in wallet.</td></tr>';
+            return;
+        }
+
+        const depositUrl = getDepositRoute();
+        body.innerHTML = rows.map((row) => {
+            const assetSymbol = escapeHtml(row.symbol);
+            const assetName = escapeHtml(row.name);
+            const tokenText = escapeHtml(row.symbol.slice(0, 2));
+            const action = row.symbol === "USDT"
+                ? `<button type="button" class="action-link fiat-action-btn" data-target-view="trade">Trade</button>`
+                : `<button type="button" class="action-link fiat-action-btn" data-target-view="fiat-deposit" data-deposit-url="${escapeHtml(depositUrl)}">Deposit</button>`;
+
+            return `
+                <tr>
+                    <td>
+                        <div class="fiat-asset-token">
+                            <div class="asset-icon fiat-token-icon" style="background:${row.symbol === "USDT" ? "rgba(50, 215, 75, 0.15)" : "rgba(127, 86, 217, 0.18)"};">
+                                <span>${tokenText}</span>
+                            </div>
+                            <div class="fiat-asset-symbol">
+                                <b>${assetSymbol}</b>
+                                <span>${assetName}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="right">${fmtAsset(row.quantity)}</td>
+                    <td class="right">$${fmtMoney(row.price)}</td>
+                    <td class="right">$${fmtMoney(row.value)}</td>
+                    <td class="right"><span class="fiat-alloc-chip" style="border-color:${toAlphaColor(row.color, 0.5)};background:${toAlphaColor(row.color, 0.2)};">${row.allocation.toFixed(2)}%</span></td>
+                    <td class="right">${action}</td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    function renderFiatAllocation(rows, walletValue) {
+        const donut = qs("fiatAllocationDonut");
+        const legend = qs("fiatAllocationLegend");
+        if (!donut || !legend) return;
+
+        const filtered = rows.filter((row) => row.value > 0).slice(0, 6);
+        if (!filtered.length || walletValue <= 0) {
+            donut.style.background = "conic-gradient(#2b3949 100%)";
+            legend.innerHTML = '<div class="history-muted">No active allocations yet.</div>';
+            setText("fiatAllocationCount", "0 assets");
+            setText("fiatDonutTotal", "$0.00");
+            return;
+        }
+
+        let cursor = 0;
+        const segments = filtered.map((row, index) => {
+            const pct = (row.value / walletValue) * 100;
+            const start = cursor;
+            const end = Math.min(100, cursor + pct);
+            cursor = end;
+            const color = FIAT_ALLOC_COLORS[index % FIAT_ALLOC_COLORS.length];
+            return { ...row, pct, start, end, color };
+        });
+
+        const gradientStops = segments.map((seg) => `${seg.color} ${seg.start.toFixed(2)}% ${seg.end.toFixed(2)}%`);
+        if (cursor < 100) {
+            gradientStops.push(`#2b3949 ${cursor.toFixed(2)}% 100%`);
+        }
+        donut.style.background = `conic-gradient(${gradientStops.join(", ")})`;
+        setText("fiatAllocationCount", `${rows.length} assets`);
+        setText("fiatDonutTotal", `$${fmtMoney(walletValue)}`);
+
+        legend.innerHTML = segments.map((seg) => `
+            <div class="fiat-legend-item">
+                <span class="fiat-legend-dot" style="background:${seg.color};"></span>
+                <span>${escapeHtml(seg.symbol)} ${escapeHtml(seg.name)}</span>
+                <strong>${seg.pct.toFixed(1)}%</strong>
+            </div>
+        `).join("");
+    }
+
+    function renderFiatPerformance() {
+        const prices = fiatState.performanceSeries.slice(-FIAT_PERFORMANCE_POINTS);
+        const first = prices.length ? Number(prices[0]) : Number(lastPrice || 0);
+        const last = prices.length ? Number(prices[prices.length - 1]) : Number(lastPrice || 0);
+        const changePct = first > 0 ? ((last - first) / first) * 100 : Number(lastChangePct || 0);
+
+        setText("fiatPerfRange", `${selectedCoin.symbol}/USDT - Last 24h`);
+        setText("fiatPerfChange", `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`);
+        const perf = qs("fiatPerfChange");
+        if (perf) {
+            perf.classList.remove("is-up", "is-down");
+            perf.classList.add(changePct >= 0 ? "is-up" : "is-down");
+        }
+
+        drawFiatSparkline(prices.length ? prices : [Math.max(lastPrice, 1), Math.max(lastPrice, 1)]);
+    }
+
+    function drawFiatSparkline(points) {
+        const canvas = qs("fiatPerformanceChart");
+        if (!canvas || !canvas.getContext) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(260, canvas.clientWidth || 260);
+        const height = Math.max(145, Number(canvas.getAttribute("height")) || 145);
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        if (!points.length) return;
+        const numeric = points.map((point) => Number(point || 0)).filter((point) => Number.isFinite(point));
+        if (!numeric.length) return;
+
+        const min = Math.min(...numeric);
+        const max = Math.max(...numeric);
+        const delta = Math.max(1e-9, max - min);
+        const padX = 10;
+        const padY = 12;
+        const innerWidth = Math.max(1, width - (padX * 2));
+        const innerHeight = Math.max(1, height - (padY * 2));
+        const positive = numeric[numeric.length - 1] >= numeric[0];
+        const lineColor = positive ? "#0ecb81" : "#f6465d";
+
+        ctx.beginPath();
+        numeric.forEach((point, index) => {
+            const x = padX + ((index / Math.max(1, numeric.length - 1)) * innerWidth);
+            const y = padY + (1 - ((point - min) / delta)) * innerHeight;
+            if (index === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, positive ? "rgba(14,203,129,0.25)" : "rgba(246,70,93,0.2)");
+        gradient.addColorStop(1, "rgba(14,18,25,0)");
+
+        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = lineColor;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = positive ? "rgba(14,203,129,0.35)" : "rgba(246,70,93,0.35)";
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        ctx.lineTo(width - padX, height - padY);
+        ctx.lineTo(padX, height - padY);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    }
+
+    function renderFiatRiskAndInsight(rows, walletValue, concentrationPct, deltaPct, concentrationTier) {
+        const volatilityPct = computeFiatVolatilityPct(fiatState.performanceSeries);
+        const spreadPct = Number(fiatState.microstructure.spreadPct || 0);
+        const concentrationNorm = clamp(concentrationPct, 0, 100);
+        const volatilityNorm = clamp(volatilityPct * 40, 0, 100);
+        const spreadNorm = clamp(spreadPct * 260, 0, 100);
+        const riskScore = Math.round((concentrationNorm * 0.5) + (volatilityNorm * 0.35) + (spreadNorm * 0.15));
+        const tier = riskScore >= 66 ? "High" : (riskScore >= 36 ? "Medium" : "Low");
+
+        setText("fiatRiskTier", tier);
+        setText("fiatRiskScore", `Score ${riskScore} / 100`);
+        setText("fiatRiskVolatility", `${volatilityPct.toFixed(2)}%`);
+        setText("fiatRiskSpread", spreadPct > 0 ? `${spreadPct.toFixed(3)}%` : "--");
+        setText("fiatRiskConcentration", `${concentrationPct.toFixed(2)}%`);
+        const fill = qs("fiatRiskFill");
+        if (fill) fill.style.width = `${riskScore}%`;
+
+        const insightTitle = qs("fiatInsightTitle");
+        const insightBody = qs("fiatInsightBody");
+        const insightAction = qs("fiatInsightAction");
+        const topAsset = rows[0];
+
+        if (!insightTitle || !insightBody || !insightAction) return;
+
+        if (concentrationTier === "High" && topAsset) {
+            insightTitle.textContent = "Concentration Risk Alert";
+            insightBody.textContent = `${topAsset.symbol} currently represents ${concentrationPct.toFixed(1)}% of wallet value. Consider rotating part of this exposure to reduce single-asset risk.`;
+            insightAction.textContent = "Rebalance in Trade";
+            insightAction.setAttribute("data-target-view", "trade");
+            return;
+        }
+
+        if (fiatState.microstructure.signal === "Thin") {
+            insightTitle.textContent = "Execution Caution";
+            insightBody.textContent = "Order-book depth is thin right now. Use limit orders and split larger trades to avoid slippage.";
+            insightAction.textContent = "Open Trade Terminal";
+            insightAction.setAttribute("data-target-view", "trade");
+            return;
+        }
+
+        if (deltaPct < -1 && walletValue > 0) {
+            insightTitle.textContent = "Defensive Momentum";
+            insightBody.textContent = "Your wallet is down over the last 24h. Consider reducing leverage and parking part of gains into USDT until volatility cools.";
+            insightAction.textContent = "Review Positions";
+            insightAction.setAttribute("data-target-view", "margin");
+            return;
+        }
+
+        if (deltaPct > 1 && walletValue > 0) {
+            insightTitle.textContent = "Positive Trend";
+            insightBody.textContent = "24h momentum is positive and liquidity is healthy. You can scale entries gradually while keeping risk controls active.";
+            insightAction.textContent = "Plan Next Trade";
+            insightAction.setAttribute("data-target-view", "trade");
+            return;
+        }
+
+        insightTitle.textContent = "Portfolio In Balance";
+        insightBody.textContent = "Allocation and market microstructure look stable. Keep monitoring concentration and funding exposure as positions change.";
+        insightAction.textContent = "View Overview";
+        insightAction.setAttribute("data-target-view", "overview");
+    }
+
+    async function ensureFiatPerformanceSeries(force = false) {
+        const symbol = String(selectedCoin.marketSymbol || "").toUpperCase().trim();
+        const now = Date.now();
+        if (!symbol) return [];
+
+        const isSameSymbol = fiatState.performanceSymbol === symbol;
+        const isFresh = isSameSymbol && (now - fiatState.performanceFetchedAt) < 60000;
+        if (!force && isFresh && fiatState.performanceSeries.length) {
+            return fiatState.performanceSeries;
+        }
+
+        if (fiatState.performanceFetchInFlight && fiatState.performanceFetchSymbol === symbol) {
+            return fiatState.performanceFetchInFlight;
+        }
+
+        fiatState.performanceFetchSymbol = symbol;
+        fiatState.performanceFetchInFlight = fetchFiatPerformanceSeries(symbol)
+            .then((series) => {
+                fiatState.performanceSeries = series;
+                fiatState.performanceSymbol = symbol;
+                fiatState.performanceFetchedAt = Date.now();
+                renderFiatWorkspace(window.nexusPortfolioSnapshot || null);
+                return series;
+            })
+            .catch((error) => {
+                console.warn("[Nexus] fiat performance fetch failed", error);
+                return fiatState.performanceSeries;
+            })
+            .finally(() => {
+                fiatState.performanceFetchInFlight = null;
+                fiatState.performanceFetchSymbol = "";
+            });
+
+        return fiatState.performanceFetchInFlight;
+    }
+
+    async function fetchFiatPerformanceSeries(symbol) {
+        try {
+            const response = await fetch(`${BINANCE_API_BASE}/klines/?symbol=${symbol}&interval=15m&limit=${FIAT_PERFORMANCE_POINTS}`);
+            if (response.ok) {
+                const rows = await response.json();
+                const series = Array.isArray(rows)
+                    ? rows.map((row) => Number(row?.[4] || 0)).filter((value) => Number.isFinite(value) && value > 0)
+                    : [];
+                if (series.length > 1) return series.slice(-FIAT_PERFORMANCE_POINTS);
+            }
+        } catch (error) {
+            // handled by fallback
+        }
+
+        const coinId = selectedCoin.id || resolveCoingeckoId(selectedCoin.symbol);
+        if (!coinId) return [];
+
+        try {
+            const response = await fetch(`${COINGECKO_API_BASE}/market-chart/?id=${coinId}&vs_currency=usd&days=1&interval=minutely`);
+            if (!response.ok) return [];
+            const payload = await response.json();
+            const prices = Array.isArray(payload?.prices) ? payload.prices : [];
+            return prices
+                .slice(-FIAT_PERFORMANCE_POINTS)
+                .map((item) => Number(item?.[1] || 0))
+                .filter((value) => Number.isFinite(value) && value > 0);
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function computeFiatVolatilityPct(series) {
+        const values = Array.isArray(series) ? series : [];
+        if (values.length < 3) return 0;
+        const returns = [];
+        for (let i = 1; i < values.length; i += 1) {
+            const prev = Number(values[i - 1] || 0);
+            const next = Number(values[i] || 0);
+            if (!Number.isFinite(prev) || !Number.isFinite(next) || prev <= 0) continue;
+            returns.push((next - prev) / prev);
+        }
+        if (returns.length < 2) return 0;
+        const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+        const variance = returns.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / (returns.length - 1);
+        return Math.sqrt(Math.max(0, variance)) * 100;
+    }
+
+    function updateFiatMicrostructure(asks, bids) {
+        const normalize = (rows) => (Array.isArray(rows) ? rows : [])
+            .slice(0, 5)
+            .map((row) => ({ price: Number(row?.[0] || 0), qty: Number(row?.[1] || 0) }))
+            .filter((row) => Number.isFinite(row.price) && row.price > 0 && Number.isFinite(row.qty) && row.qty > 0);
+
+        const askRows = normalize(asks);
+        const bidRows = normalize(bids);
+        const bestAsk = askRows[0]?.price || 0;
+        const bestBid = bidRows[0]?.price || 0;
+        const spread = bestAsk > 0 && bestBid > 0 ? (bestAsk - bestBid) : 0;
+        const spreadPct = bestBid > 0 ? (spread / bestBid) * 100 : 0;
+        const askVolume = askRows.reduce((sum, row) => sum + row.qty, 0);
+        const bidVolume = bidRows.reduce((sum, row) => sum + row.qty, 0);
+        const totalVolume = askVolume + bidVolume;
+        const imbalance = totalVolume > 0 ? ((bidVolume - askVolume) / totalVolume) : 0;
+
+        let signal = "Unknown";
+        if (spreadPct > 0) {
+            if (spreadPct <= 0.08 && Math.abs(imbalance) <= 0.25) signal = "Deep";
+            else if (spreadPct <= 0.2) signal = "Balanced";
+            else signal = "Thin";
+        }
+
+        fiatState.microstructure = {
+            bestBid,
+            bestAsk,
+            spread,
+            spreadPct,
+            bidVolume,
+            askVolume,
+            imbalance,
+            signal,
+        };
+
+        if (qs("view-fiat")?.classList.contains("active")) {
+            renderFiatWorkspace(window.nexusPortfolioSnapshot || null);
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function toAlphaColor(hex, alpha) {
+        const safe = String(hex || "").replace("#", "");
+        if (!/^[0-9a-fA-F]{6}$/.test(safe)) {
+            return `rgba(127, 86, 217, ${alpha})`;
+        }
+        const r = Number.parseInt(safe.slice(0, 2), 16);
+        const g = Number.parseInt(safe.slice(2, 4), 16);
+        const b = Number.parseInt(safe.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
 
     function initIdentificationView() {
@@ -685,6 +1351,35 @@
         const openBtn = qs("openIdentificationUpload");
         const closeBtn = qs("closeIdentificationUpload");
         const confirmBtn = qs("confirmIdentificationUpload");
+
+        // Sync Status on load
+        fetch("/api/kyc/status/")
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === "ok") {
+                    const status = data.kyc_status;
+                    const elUnverified = document.getElementById("kycStateUnverified");
+                    const elPending = document.getElementById("kycStatePending");
+                    const elApproved = document.getElementById("kycStateApproved");
+                    const elDocs = document.getElementById("kycSubmittedDocs");
+                    
+                    if (elUnverified) elUnverified.style.display = "none";
+                    if (elPending) elPending.style.display = "none";
+                    if (elApproved) elApproved.style.display = "none";
+                    if (elDocs) elDocs.style.display = "none";
+                    
+                    if (status === "unverified" || status === "rejected") {
+                        if (elUnverified) elUnverified.style.display = "block";
+                    } else if (status === "pending") {
+                        if (elPending) elPending.style.display = "block";
+                        if (elDocs) elDocs.style.display = "block";
+                    } else if (status === "approved") {
+                        if (elApproved) elApproved.style.display = "block";
+                        if (elDocs) elDocs.style.display = "block";
+                    }
+                }
+            })
+            .catch(console.error);
 
         if (!modal) return;
 
@@ -710,8 +1405,48 @@
 
         if (confirmBtn) {
             confirmBtn.addEventListener("click", () => {
-                closeModal();
-                alert("File upload started. Your document status will update once processing is complete.");
+                const docType = document.getElementById("identificationDocType").value;
+                const fileInput = document.getElementById("identificationFileInput");
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    alert("Please select a file to upload.");
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append("document_type", docType);
+                formData.append("document_image", fileInput.files[0]);
+                
+                const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+                const csrfToken = csrfMatch ? csrfMatch[1] : '';
+
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = "Uploading...";
+                
+                fetch("/api/kyc/submit/", {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": csrfToken
+                    },
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = "Confirm Upload";
+                    if(data.status === "ok") {
+                        closeModal();
+                        alert("File upload successful. Your document status is now pending review.");
+                        window.location.reload();
+                    } else {
+                        alert(data.message || "Failed to upload KYC document.");
+                    }
+                })
+                .catch(err => {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = "Confirm Upload";
+                    alert("An error occurred during upload.");
+                    console.error(err);
+                });
             });
         }
     }
@@ -868,6 +1603,7 @@
         const logo = qs("pairLogo");
         if (logo && selectedCoin.image) logo.src = selectedCoin.image;
         state.asset = getWalletBalance(selectedCoin.symbol);
+        ensureFiatPerformanceSeries(true).catch(() => {});
     }
 
     function setText(id, text) {
@@ -1819,6 +2555,7 @@
                 renderMarginBook("marginOrderBids", data.bids || [], "buy");
                 renderBook("futOrderAsks", data.asks || [], "sell");
                 renderBook("futOrderBids", data.bids || [], "buy");
+                updateFiatMicrostructure(data.asks || [], data.bids || []);
             } else {
                 const base = Number(lastPrice || 0) || 1;
                 const asks = [];
@@ -1834,6 +2571,7 @@
                 renderMarginBook("marginOrderBids", bids, "buy");
                 renderBook("futOrderAsks", asks, "sell");
                 renderBook("futOrderBids", bids, "buy");
+                updateFiatMicrostructure(asks, bids);
             }
         } catch (error) {
             reportError("depth.refresh", error);
@@ -2127,6 +2865,9 @@
                 orders: [...state.history.orders],
                 trades: [...state.history.trades],
                 transactions: [...state.history.transactions],
+            },
+            fiatInsights: {
+                microstructure: { ...fiatState.microstructure },
             },
             marketPrices,
             selectedCoin: { ...selectedCoin },
@@ -2514,3 +3255,4 @@
         },
     };
 })();
+

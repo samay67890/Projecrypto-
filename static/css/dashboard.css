@@ -629,47 +629,90 @@ select {
     padding: 16px;
 }
 
-.fiat-balance-card {
-    background: var(--card-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 20px;
-    padding: 32px;
-    margin-bottom: 20px;
+.fiat-pro-view {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    animation: fiat-fade-in 420ms ease;
+}
+
+@keyframes fiat-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fiat-hero-card {
     position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 22px;
+    padding: 28px;
+    background:
+        linear-gradient(120deg, rgba(18, 29, 47, 0.92), rgba(11, 18, 30, 0.92)),
+        radial-gradient(circle at 82% 18%, rgba(0, 229, 255, 0.22), rgba(0, 0, 0, 0) 42%),
+        radial-gradient(circle at 18% 105%, rgba(213, 0, 249, 0.16), rgba(0, 0, 0, 0) 44%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
     overflow: hidden;
 }
 
-.glow-orb {
+.fiat-hero-aura {
     position: absolute;
-    top: -50px;
-    right: -50px;
-    width: 220px;
-    height: 220px;
-    background: radial-gradient(circle, rgba(0, 229, 255, 0.08) 0%, transparent 70%);
+    width: 280px;
+    height: 280px;
+    right: -100px;
+    top: -130px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 229, 255, 0.18), rgba(0, 0, 0, 0) 70%);
+    pointer-events: none;
 }
 
-.fiat-balance-card span {
-    color: var(--text-dim);
-    font-size: 13px;
+.fiat-hero-main {
+    position: relative;
+    z-index: 1;
+}
+
+.fiat-kicker {
+    color: #90a2b5;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    font-size: 11px;
+    font-weight: 700;
 }
 
-.fiat-balance-card h1 {
-    margin: 10px 0;
-    font-size: 54px;
-    letter-spacing: -2px;
+.fiat-hero-main h1 {
+    margin: 8px 0 6px;
+    font-size: clamp(30px, 4vw, 52px);
+    letter-spacing: -1.4px;
 }
 
-.fiat-balance-card small {
-    color: var(--text-dim);
-    font-size: 18px;
-    font-weight: 400;
+.fiat-hero-sub {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #a6b2bf;
+    font-size: 14px;
+}
+
+.fiat-dot {
+    opacity: 0.4;
+    font-size: 11px;
 }
 
 .fiat-actions {
     display: flex;
+    align-items: center;
     gap: 12px;
+    position: relative;
+    z-index: 1;
 }
 
 .gradient-btn,
@@ -701,12 +744,264 @@ select {
     background: transparent;
 }
 
+.withdraw-btn i,
+.deposit-btn i {
+    margin-right: 6px;
+}
+
+.fiat-actions .gradient-btn,
+.fiat-actions .outline-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fiat-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.fiat-kpi-card {
+    border: 1px solid var(--panel-border);
+    background: rgba(13, 19, 30, 0.82);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fiat-kpi-card span {
+    color: #8fa0b3;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.fiat-kpi-card strong {
+    font-size: 18px;
+    letter-spacing: -0.2px;
+}
+
+.fiat-kpi-card small {
+    color: #9dafc2;
+    font-size: 12px;
+}
+
+.fiat-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.fiat-analytics-card {
+    background: rgba(11, 17, 27, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 210px;
+}
+
+.fiat-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.fiat-card-head h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.fiat-card-head span {
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+.fiat-allocation-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.fiat-allocation-donut {
+    width: 136px;
+    height: 136px;
+    border-radius: 50%;
+    background: conic-gradient(#2b3949 100%);
+    padding: 11px;
+    flex: 0 0 136px;
+}
+
+.fiat-donut-center {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #0b1321;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.fiat-donut-center strong {
+    font-size: 14px;
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fiat-donut-center span {
+    color: #8fa0b3;
+    font-size: 11px;
+}
+
+.fiat-allocation-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    width: 100%;
+    min-width: 0;
+}
+
+.fiat-legend-item {
+    display: grid;
+    grid-template-columns: 12px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.fiat-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+}
+
+.fiat-legend-item strong {
+    color: #e6ecf2;
+    justify-self: end;
+    font-weight: 600;
+}
+
+#fiatPerformanceChart {
+    width: 100%;
+    min-height: 145px;
+    max-height: 145px;
+}
+
+.fiat-chart-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #8fa0b3;
+    font-size: 12px;
+}
+
+.fiat-chart-foot strong {
+    color: #c5d2df;
+    font-size: 14px;
+}
+
+#fiatPerfChange.is-up {
+    color: var(--green);
+}
+
+#fiatPerfChange.is-down {
+    color: var(--red);
+}
+
+.fiat-risk-score {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.fiat-risk-track {
+    width: 100%;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.fiat-risk-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #0ecb81, #f0b90b, #f6465d);
+    transition: width 260ms ease;
+}
+
+.fiat-risk-breakdown {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+.fiat-risk-breakdown div {
+    display: flex;
+    justify-content: space-between;
+    color: #9dafc2;
+    font-size: 12px;
+}
+
+.fiat-risk-breakdown strong {
+    color: #e7edf5;
+}
+
+.fiat-insight-card h4 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.fiat-insight-card p {
+    margin: 0;
+    color: #a5b4c5;
+    line-height: 1.45;
+    font-size: 13px;
+}
+
+.fiat-insight-card .fiat-action-btn {
+    margin-top: auto;
+}
+
 .asset-table-wrap {
     background: var(--card-bg);
     border: 1px solid var(--panel-border);
     border-radius: 20px;
     padding: 10px 16px;
     overflow-x: auto;
+}
+
+.fiat-asset-table-wrap {
+    padding: 14px 16px 12px;
+    background: rgba(11, 17, 27, 0.95);
+}
+
+.fiat-table-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.fiat-table-head h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.fiat-table-head span {
+    color: var(--text-dim);
+    font-size: 12px;
 }
 
 table {
@@ -734,15 +1029,46 @@ tbody tr:last-child {
     border-bottom: none;
 }
 
-.asset-cell {
+.fiat-asset-token {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 11px;
 }
 
-.asset-cell b span {
+.fiat-asset-symbol {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fiat-asset-symbol b {
+    font-size: 14px;
+}
+
+.fiat-asset-symbol span {
     color: var(--text-dim);
-    font-weight: 400;
+    font-size: 11px;
+}
+
+.fiat-token-icon {
+    text-transform: uppercase;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: #e8f1fb;
+}
+
+.fiat-alloc-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 66px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: #dbe7f5;
+    font-size: 11px;
+    border: 1px solid rgba(127, 86, 217, 0.45);
+    background: rgba(127, 86, 217, 0.18);
 }
 
 .asset-icon {
@@ -772,6 +1098,98 @@ tbody tr:last-child {
     color: var(--accent);
     font-weight: 700;
     cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+
+.fiat-action-btn:hover {
+    color: #7af4ff;
+}
+
+.fiat-withdraw-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 65;
+    background: rgba(2, 6, 12, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 16px;
+}
+
+.fiat-withdraw-modal.show {
+    display: flex;
+}
+
+.fiat-withdraw-card {
+    width: min(510px, 100%);
+    background: linear-gradient(168deg, rgba(11, 17, 27, 0.98), rgba(10, 16, 24, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fiat-withdraw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.fiat-withdraw-head h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.fiat-withdraw-close {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: #9fb0c3;
+    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+}
+
+.fiat-withdraw-sub {
+    margin: 0;
+    color: #a6b5c6;
+    font-size: 13px;
+}
+
+.fiat-input-note {
+    color: #8fa0b3;
+    font-size: 11px;
+}
+
+.fiat-withdraw-status {
+    min-height: 18px;
+    font-size: 12px;
+    color: #8fa0b3;
+}
+
+.fiat-withdraw-status.is-error {
+    color: #ff8e9e;
+}
+
+.fiat-withdraw-status.is-success {
+    color: #5de6a8;
+}
+
+.fiat-withdraw-status.is-info {
+    color: #9ecbff;
+}
+
+.fiat-withdraw-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .margin-view {
@@ -1757,6 +2175,11 @@ tbody tr:last-child {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .fiat-kpi-strip,
+    .fiat-analytics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .ident-status-grid {
         grid-template-columns: 1fr;
     }
@@ -1805,8 +2228,19 @@ tbody tr:last-child {
         padding: 14px;
     }
 
-    .fiat-balance-card h1 {
-        font-size: 34px;
+    .fiat-hero-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .fiat-actions {
+        width: 100%;
+    }
+
+    .fiat-actions .gradient-btn,
+    .fiat-actions .outline-btn {
+        flex: 1;
+        justify-content: center;
     }
 
     .earn-hero {
@@ -1868,5 +2302,31 @@ tbody tr:last-child {
 
     .logo {
         font-size: 16px;
+    }
+
+    .fiat-kpi-strip,
+    .fiat-analytics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .fiat-allocation-wrap {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .fiat-allocation-donut {
+        width: 116px;
+        height: 116px;
+        flex-basis: 116px;
+    }
+
+    .fiat-table-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .fiat-withdraw-card {
+        padding: 16px;
     }
 }

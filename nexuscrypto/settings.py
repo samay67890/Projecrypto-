@@ -46,6 +46,7 @@ if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
 
 INSTALLED_APPS = [
+    'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -218,6 +219,11 @@ if EMAIL_USE_SSL:
 COINAPI_API_KEY = config('COINAPI_API_KEY', default='')
 BINANCE_API_KEY = config('BINANCE_API_KEY', default='')
 
+# Auth0 OAuth 2.0
+AUTH0_DOMAIN = config('AUTH0_DOMAIN', default='')
+AUTH0_CLIENT_ID = config('AUTH0_CLIENT_ID', default='')
+AUTH0_CLIENT_SECRET = config('AUTH0_CLIENT_SECRET', default='')
+
 # Logging — ensures errors are visible in Render's log viewer
 LOGGING = {
     'version': 1,
@@ -251,3 +257,10 @@ LOGGING = {
         },
     },
 }
+
+# Media Files (For KYC Uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Trigger auto-reload for .env update
+# Auth0 Reload Trigger
